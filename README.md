@@ -70,9 +70,13 @@ After ~24h of uptime you should see the flywheel firing:
 - `index_values_daily` rows appearing nightly with the champion methodology
 - `generated_content` rows with daily brief drafts at 07:00 UTC
 
-## Manual handoff steps for Carlos
+## Status
 
-See **`docs/handoff.md`** for the complete checklist (Supabase project creation, Inngest signing keys, Vercel link, etc.).
+**System is live in production.** Web at https://compute-terminal.vercel.app, Inngest cloud firing crons against the Vercel-deployed `/api/inngest`, no laptop required. See `docs/production.md` for the runbook.
+
+## Manual handoff steps (only needed for fresh local dev setup)
+
+See **`docs/handoff.md`** for the complete first-time checklist (Supabase project creation, Inngest signing keys, Vercel link, etc.).
 
 ## Docs
 
