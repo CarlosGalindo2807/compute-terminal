@@ -58,8 +58,8 @@ export async function generateDailyBrief(inputs: BriefInputs): Promise<DailyBrie
   });
 
   const text = resp.content
-    .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-    .map((b) => b.text)
+    .filter((b) => b.type === 'text')
+    .map((b) => (b as { text: string }).text)
     .join('');
   return DailyBriefSchema.parse(JSON.parse(extractJson(text)));
 }
