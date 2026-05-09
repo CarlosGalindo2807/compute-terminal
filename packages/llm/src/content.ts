@@ -47,7 +47,7 @@ export async function generateDailyBrief(inputs: BriefInputs): Promise<DailyBrie
   const resp = await getAnthropic().messages.create({
     model: HIGH_QUALITY_MODEL,
     max_tokens: 4096,
-    thinking: { type: 'adaptive' },
+    thinking: { type: 'adaptive' } as never,
     system: SYSTEM,
     messages: [
       {
