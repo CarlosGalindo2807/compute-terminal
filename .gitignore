@@ -31,3 +31,5 @@ venv/
 
 # OS
 Thumbs.db
+
+.vercel
