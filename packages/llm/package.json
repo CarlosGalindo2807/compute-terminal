@@ -1,0 +1,25 @@
+{
+  "name": "@compute-terminal/llm",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./normalize": "./src/normalize.ts",
+    "./assess-provider": "./src/assess-provider.ts",
+    "./content": "./src/content.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "@compute-terminal/db": "workspace:*",
+    "@compute-terminal/shared": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

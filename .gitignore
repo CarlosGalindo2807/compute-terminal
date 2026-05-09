@@ -1,0 +1,33 @@
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+build/
+.turbo/
+coverage/
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db

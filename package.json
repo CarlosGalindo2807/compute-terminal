@@ -1,0 +1,32 @@
+{
+  "name": "compute-terminal",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Compute Index Terminal — real-time GPU-hour aggregator and reference index",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:scrapers": "cd apps/scrapers && python -m pytest",
+    "db:migrate": "node --env-file=.env packages/db/scripts/run-migrations.mjs",
+    "db:seed": "node --env-file=.env packages/db/scripts/run-seeds.mjs",
+    "db:reset": "node --env-file=.env packages/db/scripts/reset.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.10.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

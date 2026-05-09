@@ -1,0 +1,10 @@
+{
+  "name": "@compute-terminal/scrapers",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "test": "python -m pytest -q",
+    "lint": "ruff check .",
+    "format": "ruff format ."
+  }
+}

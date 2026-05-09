@@ -1,0 +1,25 @@
+{
+  "name": "@compute-terminal/db",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "migrate": "node scripts/run-migrations.mjs",
+    "seed": "node scripts/run-seeds.mjs",
+    "reset": "node scripts/reset.mjs",
+    "generate-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public > src/types.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.46.1",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}
