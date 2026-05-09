@@ -38,7 +38,7 @@ export default function Home() {
           {[
             { label: 'Tracked providers', value: '10' },
             { label: 'Snapshots / day', value: '~20K' },
-            { label: 'Index methodologies A/B-tested nightly', value: '5' },
+            { label: 'Published methodology · locked', value: 'v1.0' },
           ].map((s) => (
             <div key={s.label} className="bg-bg-surface p-6">
               <div className="mono text-2xs uppercase tracking-[0.18em] text-ink-muted">{s.label}</div>

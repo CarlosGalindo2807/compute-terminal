@@ -10,6 +10,7 @@ export function Nav() {
         <nav className="flex items-center gap-6 text-sm">
           <Link href="/markets" className="text-ink-secondary hover:text-ink-primary">Markets</Link>
           <Link href="/index/cti-composite" className="text-ink-secondary hover:text-ink-primary">Index</Link>
+          <Link href="/methodology" className="text-ink-secondary hover:text-ink-primary">Methodology</Link>
           <Link href="/blog" className="text-ink-secondary hover:text-ink-primary">Brief</Link>
           <Link
             href="/login"

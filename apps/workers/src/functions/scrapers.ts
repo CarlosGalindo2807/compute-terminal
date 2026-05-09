@@ -51,13 +51,33 @@ export const scrapeVast = inngest.createFunction(
     const sb = getServiceClient();
     const startedAt = Date.now();
 
-    const { data: provider } = await sb
-      .from('providers')
-      .select('id')
-      .eq('slug', 'vast')
-      .single();
-    if (!provider) throw new Error('provider vast not seeded');
-    const providerId = provider.id;
+    const lookup = await sb.from('providers').select('id').eq('slug', 'vast').maybeSingle();
+    if (!lookup.data) {
+      // Diagnostic: tells us which Supabase the deployed function is actually
+      // pointing at, without leaking the key. This is the line that fired silently
+      // in early production (env mismatch on Vercel pointing at the wrong project).
+      const supabaseHost = (() => {
+        try {
+          return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').host;
+        } catch {
+          return 'invalid';
+        }
+      })();
+      await publishEvent({
+        event_type: 'scraper_run_failed',
+        entity_type: 'provider',
+        entity_id: 'vast',
+        payload: {
+          reason: 'provider_lookup_returned_no_row',
+          lookup_error: lookup.error?.message ?? null,
+          supabase_host: supabaseHost,
+          service_key_present: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+        },
+        source: 'inngest:scrape-vast',
+      });
+      return { ok: false, reason: 'provider_lookup_failed' };
+    }
+    const providerId = lookup.data.id;
 
     let offers: VastOffer[];
     try {

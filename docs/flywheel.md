@@ -29,18 +29,23 @@ Every scrape success or failure adjusts `providers.reliability_score`:
 
 The index calculator weights snapshots by reliability, so a flaky provider's data dilutes itself out of the benchmark automatically.
 
-## 3. Index methodology is A/B-tested every night
+## 3. Index methodology research runs nightly — published formula is locked
 
-`index-calculator` runs five methodologies against each compute_index every night:
+The published index uses one fixed methodology (currently `filtered_vwap` v1.0) — see `/methodology` for the spec. The formula does not auto-change. Changing it is a committee decision.
+
+What's still autonomous is the *research input* the committee reads:
+`index-calculator` runs five methodologies against each compute_index every night and writes the results to `index_methodology_experiments`:
 - simple_vwap
-- filtered_vwap (excludes outliers)
+- filtered_vwap (the published one)
 - trimmed_mean_10
 - median_weighted (by provider reliability)
 - time_decay_vwap
 
-Each methodology is scored on `volatility` (vs yesterday), `consistency` (vs other methodologies), and `coverage` (provider count). Composite = `0.5*consistency + 0.3*(1-volatility) + 0.2*coverage`. The champion is recorded in `index_values_daily.methodology_used`. If the champion changes, a `methodology_changed` event fires for review.
+Each methodology is scored on `volatility` (vs yesterday), `consistency` (vs the published value), and `coverage` (provider count). Composite = `0.5*consistency + 0.3*(1-volatility) + 0.2*coverage`. The top-of-research is logged with `was_champion=true` but does not override the published value.
 
-The index gets *more defensible* over time because every methodology change is logged with the data that justified it.
+The committee reviews 90 days of research output every quarter. If a non-published candidate sustains a margin against the published one, the committee can propose a version bump (v1.0 → v1.1) — published with 30 days notice via `/methodology`.
+
+The index becomes *more defensible* over time because every methodology comparison is logged, every published value is version-stamped (`index_values_daily.methodology_version`), and the formula is reproducible from open code.
 
 ## 4. Provider universe expands automatically
 

@@ -94,3 +94,28 @@ export function compositeScore(opts: {
 }): number {
   return 0.5 * opts.consistency + 0.3 * (1 - opts.volatility) + 0.2 * opts.coverage;
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// Published methodology — locked. Changes only via Index Committee review.
+// See /methodology for the public formula and the change-control policy.
+// ────────────────────────────────────────────────────────────────────────
+
+export const PUBLISHED_METHODOLOGY_VERSION = 'v1.0' as const;
+
+export const PUBLISHED_METHODOLOGY: {
+  version: typeof PUBLISHED_METHODOLOGY_VERSION;
+  formulaId: MethodologyName;
+  windowHours: number;
+  minObservations: number;
+  outlierFilter: 'mad_3_sigma';
+  weight: 'num_gpus';
+  reliabilityFloor: number;
+} = {
+  version: 'v1.0',
+  formulaId: 'filtered_vwap',
+  windowHours: 24,
+  minObservations: 5,
+  outlierFilter: 'mad_3_sigma',
+  weight: 'num_gpus',
+  reliabilityFloor: 0.5,
+};

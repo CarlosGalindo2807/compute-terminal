@@ -42,13 +42,15 @@ Non-obvious calls made during the v0 build. Each entry: what / why / what we'd r
 
 **Reconsider if:** model migration tooling becomes a maintenance burden. The wrapper in `packages/llm` is intentionally tiny so swapping providers is mostly find-and-replace.
 
-## Five-methodology A/B nightly, champion auto-selected
+## ~~Five-methodology A/B nightly, champion auto-selected~~ → Locked methodology v1.0 published, A/B becomes research input (revised 2026-05-09)
 
-**What:** index-calculator runs all five methodologies and picks the highest composite score.
+**What (revised 2026-05-09):** The index-calculator now publishes a fixed formula (currently `filtered_vwap`, version v1.0). The same five methodologies still run nightly, but write only to `index_methodology_experiments`. The research output is reviewed quarterly by the Index Committee and changes the published formula only with public 30-day notice.
 
-**Why:** the *whole pitch* is "this is a defensible benchmark". Defensibility comes from being able to point at a logged experiment and say "this methodology won by X on these days because Y". Hard-coding one methodology defeats the moat.
+**Why we switched:** A licensed settlement benchmark (the whole 2-3 year goal — settlement of compute futures) cannot have its formula change without notice. ICE / S&P / MSCI all publish fixed methodologies that change only via committee. Auto-selecting champion was good as a research moat but disqualifying as a published index. The flywheel value is preserved: every candidate is still logged, every published value is version-stamped (`index_values_daily.methodology_version`), and the committee has audit-grade evidence to defend its decisions.
 
-**Reconsider if:** the methodology keeps oscillating week-to-week (signals an unstable composite_score formula). Tune weights or add a "stickiness" penalty for switches.
+**Concretely:** `PUBLISHED_METHODOLOGY` constant in `packages/shared/src/methodology.ts` + migration `009_methodology_v1.sql` introduce `methodology_versions` and `methodology_changes` tables. `/methodology` page publishes the spec and version history. Test `methodology.test.ts` locks v1.0 to prevent drift.
+
+**Reconsider if:** the committee decides a different formula better serves licensees. That triggers a v1.x bump with public notice — exactly the path this design is built for.
 
 ## Spawning Python from the Inngest worker via `spawn`
 
