@@ -36,7 +36,8 @@
       "PowerShell(Get-ChildItem *)",
       "PowerShell(vercel inspect *)",
       "PowerShell($env:NODE_OPTIONS = \"--use-system-ca\"; Set-Location D:\\\\computo; npx --yes pnpm@9.15.0 install --lockfile-only 2>&1 | Select-Object -Last 5)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "PowerShell(npm view *)"
     ]
   }
 }
