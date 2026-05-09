@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient(supabaseUrl, anon, {
     cookies: {
       getAll: () => cookieStore.getAll(),
-      setAll: (toSet) => toSet.forEach((c) => cookieStore.set(c.name, c.value, c.options)),
+      setAll: (toSet: { name: string; value: string; options?: Record<string, unknown> }[]) =>
+        toSet.forEach((c) => cookieStore.set(c.name, c.value, c.options)),
     },
   });
 

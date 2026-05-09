@@ -19,7 +19,8 @@ async function sendMagicLink(formData: FormData) {
   const supabase = createServerClient(url, anon, {
     cookies: {
       getAll: () => cookieStore.getAll(),
-      setAll: (toSet) => toSet.forEach((c) => cookieStore.set(c.name, c.value, c.options)),
+      setAll: (toSet: { name: string; value: string; options?: Record<string, unknown> }[]) =>
+        toSet.forEach((c) => cookieStore.set(c.name, c.value, c.options)),
     },
   });
   await supabase.auth.signInWithOtp({
