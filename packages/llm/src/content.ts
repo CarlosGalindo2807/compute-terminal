@@ -1,7 +1,7 @@
 // Daily-brief content generator. Higher-quality model for human-facing copy.
 
 import { z } from 'zod';
-import { HIGH_QUALITY_MODEL, getAnthropic } from './index.js';
+import { HIGH_QUALITY_MODEL, getAnthropic } from './index';
 
 export const DailyBriefSchema = z.object({
   brief_markdown: z.string(),

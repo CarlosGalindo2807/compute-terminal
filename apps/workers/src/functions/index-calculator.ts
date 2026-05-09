@@ -9,8 +9,8 @@ import {
   type MethodologyInput,
   type MethodologyName,
 } from '@compute-terminal/shared/methodology';
-import { inngest } from '../inngest/client.js';
-import { publishEvent } from '../inngest/publish-event.js';
+import { inngest } from '../inngest/client';
+import { publishEvent } from '../inngest/publish-event';
 
 const WINDOW_HOURS = 24;
 

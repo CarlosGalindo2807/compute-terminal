@@ -2,8 +2,8 @@
 // last hour, per gpu_model). Adjust provider reliability if a provider trends bad.
 
 import { getServiceClient } from '@compute-terminal/db';
-import { inngest } from '../inngest/client.js';
-import { publishEvent } from '../inngest/publish-event.js';
+import { inngest } from '../inngest/client';
+import { publishEvent } from '../inngest/publish-event';
 
 const MAD_MULTIPLIER = 3;
 const PROVIDER_OUTLIER_RATIO_THRESHOLD = 0.3;

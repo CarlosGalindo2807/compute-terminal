@@ -2,7 +2,7 @@
 // it's a real compute marketplace worth integrating.
 
 import { z } from 'zod';
-import { DEFAULT_MODEL, getAnthropic } from './index.js';
+import { DEFAULT_MODEL, getAnthropic } from './index';
 
 export const ProviderAssessmentSchema = z.object({
   is_compute_marketplace: z.boolean(),

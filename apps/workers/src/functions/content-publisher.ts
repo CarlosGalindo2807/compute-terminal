@@ -3,8 +3,8 @@
 // admin can flip to 'rejected' before the time hits to block.
 
 import { getServiceClient } from '@compute-terminal/db';
-import { inngest } from '../inngest/client.js';
-import { publishEvent } from '../inngest/publish-event.js';
+import { inngest } from '../inngest/client';
+import { publishEvent } from '../inngest/publish-event';
 
 export const contentPublisher = inngest.createFunction(
   { id: 'content-publisher', name: 'Publish scheduled content' },

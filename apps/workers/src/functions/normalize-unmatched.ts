@@ -5,8 +5,8 @@
 
 import { getServiceClient } from '@compute-terminal/db';
 import { normalizeWithLlm } from '@compute-terminal/llm';
-import { inngest } from '../inngest/client.js';
-import { publishEvent } from '../inngest/publish-event.js';
+import { inngest } from '../inngest/client';
+import { publishEvent } from '../inngest/publish-event';
 
 const BATCH_SIZE = 50;
 const AUTO_RESOLVE_THRESHOLD = 0.95;

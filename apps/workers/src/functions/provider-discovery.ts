@@ -3,8 +3,8 @@
 
 import { getServiceClient } from '@compute-terminal/db';
 import { assessProvider } from '@compute-terminal/llm';
-import { inngest } from '../inngest/client.js';
-import { publishEvent } from '../inngest/publish-event.js';
+import { inngest } from '../inngest/client';
+import { publishEvent } from '../inngest/publish-event';
 
 const SEARCH_QUERIES = [
   'gpu rental marketplace 2026',

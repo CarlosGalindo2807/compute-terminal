@@ -22,7 +22,21 @@
       "PowerShell($env:NODE_OPTIONS = \"--use-system-ca\"; node --env-file=D:\\\\computo\\\\.env D:\\\\computo\\\\packages\\\\db\\\\scripts\\\\verify-counts.mjs 2>&1)",
       "PowerShell(gh *)",
       "PowerShell(gh auth *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "Bash(grep -iE \"\\\\.env$|\\\\.venv|secret|credentials\")",
+      "Bash(git commit -m ' *)",
+      "PowerShell(gh repo *)",
+      "PowerShell(vercel link *)",
+      "Bash(git -C D:/computo status --short)",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "PowerShell(vercel deploy *)",
+      "PowerShell(vercel env *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(vercel inspect *)",
+      "PowerShell($env:NODE_OPTIONS = \"--use-system-ca\"; Set-Location D:\\\\computo; npx --yes pnpm@9.15.0 install --lockfile-only 2>&1 | Select-Object -Last 5)",
+      "Bash(git commit *)"
     ]
   }
 }

@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-export type { Database, Tables, Enums } from './types.js';
+export type { Database, Tables, Enums } from './types';
 
 let serviceClient: SupabaseClient | null = null;
 let anonClient: SupabaseClient | null = null;

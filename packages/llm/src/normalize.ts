@@ -2,7 +2,7 @@
 // Uses Claude with structured JSON output via output_config.format.
 
 import { z } from 'zod';
-import { DEFAULT_MODEL, getAnthropic } from './index.js';
+import { DEFAULT_MODEL, getAnthropic } from './index';
 
 const NormalizeSchema = z.object({
   gpu_model_slug: z.string().nullable(),

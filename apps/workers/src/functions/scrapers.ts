@@ -12,8 +12,8 @@ import { join, resolve as pathResolve } from 'node:path';
 import { getServiceClient } from '@compute-terminal/db';
 import { normalizeGpuString } from '@compute-terminal/shared/normalize-fastpath';
 
-import { inngest } from '../inngest/client.js';
-import { publishEvent } from '../inngest/publish-event.js';
+import { inngest } from '../inngest/client';
+import { publishEvent } from '../inngest/publish-event';
 
 // ────────────────────────────────────────────────
 // scrape-vast (TS-native, runs anywhere Node runs)

@@ -4,7 +4,7 @@
 import { serve as serveHono } from '@hono/node-server';
 import { Hono } from 'hono';
 import { serve } from 'inngest/hono';
-import { functions, inngest } from './inngest/config.js';
+import { functions, inngest } from './inngest/config';
 
 const app = new Hono();
 

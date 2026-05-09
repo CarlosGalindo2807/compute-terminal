@@ -4,8 +4,8 @@
 
 import { getServiceClient } from '@compute-terminal/db';
 import { generateDailyBrief, type BriefInputs } from '@compute-terminal/llm';
-import { inngest } from '../inngest/client.js';
-import { publishEvent } from '../inngest/publish-event.js';
+import { inngest } from '../inngest/client';
+import { publishEvent } from '../inngest/publish-event';
 
 const WINDOW_HOURS = 24;
 

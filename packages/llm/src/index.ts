@@ -17,6 +17,6 @@ export const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
 export const HIGH_QUALITY_MODEL = 'claude-opus-4-7';
 export const FALLBACK_MODEL = process.env.ANTHROPIC_MODEL_FALLBACK ?? 'claude-haiku-4-5-20251001';
 
-export * from './normalize.js';
-export * from './assess-provider.js';
-export * from './content.js';
+export * from './normalize';
+export * from './assess-provider';
+export * from './content';

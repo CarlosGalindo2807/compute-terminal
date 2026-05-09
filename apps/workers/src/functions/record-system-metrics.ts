@@ -1,7 +1,7 @@
 // Hourly: snapshot system_health_metrics so /admin/health has trendlines.
 
 import { getServiceClient } from '@compute-terminal/db';
-import { inngest } from '../inngest/client.js';
+import { inngest } from '../inngest/client';
 
 export const recordSystemMetrics = inngest.createFunction(
   { id: 'record-system-metrics', name: 'Record hourly system health metrics' },
