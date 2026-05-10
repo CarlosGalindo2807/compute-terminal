@@ -306,7 +306,9 @@ export function parseRunpodGpuType(gt: RunpodGpuType): ParsedListing[] {
 // scrape-lambda (Lambda Labs HTML, regex parse)
 // ────────────────────────────────────────────────
 
-const LAMBDA_URL = 'https://lambdalabs.com/service/gpu-cloud';
+// Lambda Labs migrated lambdalabs.com → lambda.ai in 2026; the legacy host
+// returns 404. The pricing path is unchanged.
+const LAMBDA_URL = 'https://lambda.ai/service/gpu-cloud';
 
 // Extract GPU mention and a nearby price (within 200 chars of plain text).
 // The page is JS-heavy; this tolerates table-or-grid markup variations and is
