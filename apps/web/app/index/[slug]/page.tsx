@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation';
 import { Nav } from '@/components/nav';
-import { Sparkline } from '@/components/sparkline';
+import { IndexChart } from '@/components/index-chart';
 import { formatPrice, formatPctChange } from '@compute-terminal/shared/formatters';
 import { getServiceClient } from '@/lib/supabase-server';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function IndexDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -14,16 +14,30 @@ export default async function IndexDetail({ params }: { params: Promise<{ slug: 
 
   const { data: history } = await sb
     .from('index_values_daily')
-    .select('date, vwap, methodology_used, num_observations, num_providers, confidence_score')
+    .select('date, vwap, methodology_used, methodology_version, num_observations, num_providers, confidence_score')
     .eq('index_id', idx.id)
     .order('date', { ascending: true })
     .limit(90);
 
-  const series = (history ?? []).map((r) => Number(r.vwap)).filter(Number.isFinite);
-  const latest = series.at(-1) ?? NaN;
-  const earliest = series[0] ?? NaN;
+  const rows = history ?? [];
+  const chartPoints = rows
+    .map((r) => ({
+      date: r.date as string,
+      vwap: Number(r.vwap),
+      methodology_version: (r.methodology_version as string | null) ?? null,
+    }))
+    .filter((p) => Number.isFinite(p.vwap));
+
+  const latest = chartPoints.at(-1)?.vwap ?? NaN;
+  const earliest = chartPoints[0]?.vwap ?? NaN;
   const delta = earliest && earliest > 0 ? (latest - earliest) / earliest : NaN;
   const positive = delta >= 0;
+
+  // Watermark = the most-recent row's stamped methodology, falling back to v1.0
+  // (the published version) so the chart always carries an attribution.
+  const latestVersion = (rows.at(-1)?.methodology_version as string | undefined) ?? 'v1.0';
+  const latestFormula = (rows.at(-1)?.methodology_used as string | undefined) ?? 'filtered_vwap';
+  const watermark = `${latestVersion} · ${latestFormula}`;
 
   return (
     <>
@@ -45,9 +59,16 @@ export default async function IndexDetail({ params }: { params: Promise<{ slug: 
             </div>
           </div>
           <div className="bg-bg-surface p-5">
-            <div className="mono text-2xs uppercase tracking-wider text-ink-muted">Trend</div>
-            <div className="mt-2"><Sparkline values={series.slice(-90)} width={240} height={48} positive={positive} /></div>
+            <div className="mono text-2xs uppercase tracking-wider text-ink-muted">Methodology</div>
+            <div className="display mt-1 text-3xl">{latestVersion}</div>
+            <div className="mono mt-1 text-2xs uppercase tracking-wider text-ink-muted">
+              {latestFormula}
+            </div>
           </div>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded border border-bg-border bg-bg-surface p-3">
+          <IndexChart values={chartPoints} watermark={watermark} positive={positive} />
         </div>
 
         <h2 className="display mt-12 text-2xl">Methodology</h2>
