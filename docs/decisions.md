@@ -115,6 +115,32 @@ Non-obvious calls made during the v0 build. Each entry: what / why / what we'd r
 
 **Don't:** use `vercel env add` from PowerShell stdin (uploads empty values) or paste env values from editors that auto-add BOM. Use the script.
 
+## Scrapers fully TS-native, drop Python spawn (added 2026-05-11)
+
+**What:** `apps/workers/src/functions/scrapers.ts` now ships three TS-native Inngest functions: `scrape-vast` (REST, unchanged), `scrape-runpod` (GraphQL POST, ported from `apps/scrapers/providers/runpod/scraper.py`), and `scrape-lambda_labs` (regex on the marketing page HTML, ported from the BeautifulSoup parser). The `runPythonScraper` / `makeShellScraper` helpers and the `child_process.spawn` import are gone.
+
+**Why:** On Vercel the python venv binary doesn't exist, so the spawn raised `ENOENT` every 5 minutes and wrote a `scraper_run_failed` event. That was real noise — `providers.reliability_score` dropped artificially because failure rate was being computed on attempts that could never succeed in the deployment target. After porting, both providers write actual `price_snapshots` rows and the failure events are reserved for genuine scrape errors.
+
+**What we kept:** `apps/scrapers/` Python tree stays in the repo. It's the canonical implementation for local backfills (where Playwright is available for Lambda's JS-rendered pricing fallback) and the regression-test fixtures the TS parsers were ported against. The Inngest cron now points at the TS path.
+
+**Reconsider if:** Lambda's marketing page goes 100% client-rendered and the static HTML stops including the price strings — then we'd need Playwright (no TS-native equivalent that runs on Vercel functions), and the choices are (a) move the Lambda scraper to a Railway worker that already has Playwright installed, or (b) hit a different Lambda data source if they expose one.
+
+## Vercel functions colocated in `fra1` + ISR on `/markets` (added 2026-05-11)
+
+**What:** `apps/web/vercel.json` pins `regions: ["fra1"]`. `/markets` drops `dynamic = 'force-dynamic'` and keeps `revalidate = 30`.
+
+**Why:** Supabase project lives in `eu-central-1`. Vercel's default `iad1` adds ~150 ms RTT per query, which is the dominant cost on `/markets` after the 28→1 query refactor (warm went 7170 ms → 670 ms). Frankfurt removes the trans-Atlantic hop. Combined with ISR, hot cache reads serve from the edge without ever entering the function — first user every 30s pays the (now-shorter) function path, everyone else gets static-fast responses.
+
+**Reconsider if:** we add a US-east customer for whom EU-resident Vercel edge still feels slow, or Supabase moves region. With Fluid Compute and `regions` array, multi-region is a config change.
+
+## @anthropic-ai/sdk 0.40 → 0.95.1 (added 2026-05-11)
+
+**What:** Bumped the SDK across `packages/llm`. Removed the `as never` casts on `thinking: { type: 'adaptive' }` (`content.ts`) and on the `system: [...]` array with `cache_control` blocks (`normalize.ts`) — both shapes are now first-class in the SDK types.
+
+**Why:** The casts were a 2026-Q1 workaround that compounded every time someone touched those files. The new SDK types `thinking` as a first-class param and accepts `cache_control` on system text blocks without a cast. No runtime API changes affect our usage path; typecheck passes across all 7 workspace packages.
+
+**Reconsider if:** the SDK ships a breaking change to `messages.create` request shape that touches our two callsites — both are simple text-in / JSON-out so this is unlikely.
+
 ## Thin admin auth (env-listed emails) instead of role tables
 
 **What:** `lib/auth.ts` checks `email ∈ process.env.ADMIN_EMAILS`.

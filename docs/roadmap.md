@@ -8,13 +8,11 @@ This is the working punch list. Status of *closed* items lives in `docs/decision
 
 ## A. Quick wins (1-2h each)
 
-- [ ] **A1 · Fix RunPod + Lambda scrapers**. Both currently spawn Python on Vercel and fail every 5 min with `spawn python3 ENOENT`. The `scraper_run_failed` events are noise that artificially degrades `providers.reliability_score`. Two paths:
-  - Port to TS-native (RunPod is GraphQL JSON, ~15 lines; Lambda is HTML scraping, ~50 lines with `cheerio`).
-  - Or unregister them in `apps/workers/src/inngest/config.ts` until ported.
-- [ ] **A2 · Move Vercel functions to `fra1`**. Today they run in `iad1` (Washington DC) → ~150 ms RTT to Supabase eu-central-1. Co-locating in Frankfurt brings `/markets` warm from ~670ms to ~250ms. Add to `apps/web/vercel.json` (or root `vercel.json`).
-- [ ] **A3 · Drop `force-dynamic` from `/markets`, lean on `revalidate=30`**. Already serves a 30-second-stale ISR cache. Combined with A2, sub-100ms perceived load for 99% of hits.
-- [ ] **A4 · Bump `@anthropic-ai/sdk`** off pinned 0.40 to current. Lets us drop `as never` casts on `thinking: { type: 'adaptive' }` and re-adopt `output_config.format` for schema-strict structured outputs (cleaner than the prompt-engineered JSON path we ship today).
-- [ ] **A5 · Add `BRAVE_SEARCH_API_KEY`** to enable `provider-discovery`. Without it the cron runs nightly and no-ops. Brave free tier (2000 queries/mo) is plenty for daily discovery.
+- [x] ~~A1 · Fix RunPod + Lambda scrapers~~ — shipped 2026-05-11, both are TS-native (see `docs/decisions.md`).
+- [x] ~~A2 · Move Vercel functions to `fra1`~~ — shipped 2026-05-11 via `apps/web/vercel.json`.
+- [x] ~~A3 · Drop `force-dynamic` from `/markets`~~ — shipped 2026-05-11, ISR via `revalidate = 30`.
+- [x] ~~A4 · Bump `@anthropic-ai/sdk`~~ — shipped 2026-05-11, 0.40 → 0.95.1, `as never` casts removed.
+- [ ] **A5 · Add `BRAVE_SEARCH_API_KEY`** to enable `provider-discovery`. Without it the cron runs nightly and no-ops. Brave free tier (2000 queries/mo) is plenty for daily discovery. *User action: provision key, then `vercel env add BRAVE_SEARCH_API_KEY` (use `scripts/fix-vercel-env-bom.mjs` for the upload to avoid BOM contamination).*
 
 ## B. Things the published methodology needs but doesn't have yet
 
