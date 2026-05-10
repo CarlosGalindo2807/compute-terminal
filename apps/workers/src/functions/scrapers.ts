@@ -322,16 +322,14 @@ export const scrapeLambda = inngest.createFunction(
     const sb = getServiceClient();
     const startedAt = Date.now();
 
-    const lookup = await sb
-      .from('providers')
-      .select('id')
-      .eq('slug', 'lambda_labs')
-      .maybeSingle();
+    // Provider seed slug is 'lambda' (the Inngest function id stays
+    // 'scrape-lambda_labs' for historical continuity with the old Python spawn).
+    const lookup = await sb.from('providers').select('id').eq('slug', 'lambda').maybeSingle();
     if (!lookup.data) {
       await publishEvent({
         event_type: 'scraper_run_failed',
         entity_type: 'provider',
-        entity_id: 'lambda_labs',
+        entity_id: 'lambda',
         payload: {
           reason: 'provider_lookup_returned_no_row',
           lookup_error: lookup.error?.message ?? null,
