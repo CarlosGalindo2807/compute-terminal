@@ -5,6 +5,8 @@ Real-time aggregator of GPU-hour prices across marketplaces and clouds. Bloomber
 > **Architectural non-negotiable:** every component must answer *"how does this make the system smarter tomorrow without human intervention?"* See `docs/flywheel.md`.
 >
 > **Published index methodology:** the formula is locked at v1.0 (`filtered_vwap`, MAD-3σ outlier filter, 24h window, num_gpus weight, reliability_floor=0.5). It changes only via Index Committee review — see [/methodology](https://compute-terminal.vercel.app/methodology) for the public spec and version history.
+>
+> **What's next:** the working punch list is `docs/roadmap.md`. Closed decisions live in `docs/decisions.md`.
 
 ## Stack
 
