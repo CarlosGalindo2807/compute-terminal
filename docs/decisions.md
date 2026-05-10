@@ -157,6 +157,26 @@ Non-obvious calls made during the v0 build. Each entry: what / why / what we'd r
 
 **Why memory:** the domain change isn't documented anywhere visible, and the `lambdalabs.com` redirect is *not* in place — the legacy host genuinely 404s rather than serving a 301. If we ever revive the Python scraper for local backfill, that file's `URL` constant needs the same edit (`apps/scrapers/providers/lambda_labs/scraper.py`).
 
+## Provider-discovery hardening — defense in depth ahead of Brave key (added 2026-05-11)
+
+**Background:** `provider-discovery` runs daily, takes Brave Search results, fetches each candidate's landing page, asks Claude to assess, and queues survivors into `provider_candidates` for **manual** admin approval at `/admin/providers`. The manual approval is the load-bearing safety boundary — approving only flips a status, it does NOT auto-create a `providers` row or auto-fetch from the candidate URL. Onboarding a real provider always requires writing scraper code by hand.
+
+That said, before flipping `BRAVE_SEARCH_API_KEY` on, we widened the moat between "fetch a candidate URL" and "anything bad can happen":
+
+**a. Private-IP block (SSRF guard).** `apps/workers/src/lib/url-safety.ts` resolves the candidate hostname via `dns.promises.lookup({ all: true })` and rejects if any A/AAAA record falls in RFC1918, loopback, link-local (incl. AWS/GCP/Azure metadata 169.254.169.254), 0.0.0.0/8, CGNAT, multicast, ULA `fc00::/7`, or IPv4-mapped private. `all: true` defeats DNS rebinding (a poisoned domain that resolves to two records, one public one private). Malformed IP strings fail closed.
+
+**b. No redirects.** `safeFetch` uses `redirect: 'manual'` — a 3xx response is treated as a failure with `reason=redirect_blocked_<status>`. Without this, an attacker could pass the IP check on a public hostname, then redirect us to `127.0.0.1` or metadata.
+
+**c. TLD allowlist.** Curated set: `ai io com net co cloud computer gpu dev app sh tech`. Country TLDs that statistically dominate abuse (`.ru .cn .tk .zip` …) get rejected before fetch, before LLM, before DNS — earliest possible cut. Adding a TLD is one-line cheap; bias is towards rejecting unfamiliar.
+
+**d. Candidate cap 12 → 5.** Tighter Brave quota usage and a smaller blast surface per run. We're not optimizing for breadth; we're optimizing for "every candidate that lands in the admin queue is worth a human's 10 seconds".
+
+**e. Prompt-injection guard.** `assess-provider.ts` system prompt explicitly tells the model that the user-message page text is untrusted, and that any text inside it asking the model to redefine its role / change ratings / output non-schema is itself signal of "spam"/"low". User message wraps the page text in `<<<page>>> … <<<end-page>>>` delimiters as a structural marker. The combination is defense-in-depth on top of the manual gate — even if a page jailbroke the model and fake-rated itself "high priority 9", a human still has to click Approve, and Approve still doesn't onboard.
+
+**Why I'm being thorough on a feature that's still gated by manual approval:** Carlos's framing was correct — once an attacker gets ANY foothold in the discovery pipeline (even just "their URL gets fetched from our IP"), they have an SSRF surface. Hardening before the key is provisioned is cheaper than hardening after the first incident.
+
+**Reconsider if:** we ever automate "approve and onboard" without human review (don't). Or if the TLD allowlist starts blocking legitimate candidates — broaden the set, never disable the gate.
+
 ## Thin admin auth (env-listed emails) instead of role tables
 
 **What:** `lib/auth.ts` checks `email ∈ process.env.ADMIN_EMAILS`.
