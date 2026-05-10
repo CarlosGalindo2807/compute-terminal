@@ -1,0 +1,51 @@
+# CODEOWNERS — automatic review-required gating
+#
+# When a PR touches any of the paths below, GitHub blocks merge until the
+# listed owner approves. This is the load-bearing safety boundary that lets
+# us run the Index Architect agent autonomously: even if the agent (or any
+# other PR author) wants to modify the published methodology, a human review
+# is mandatory.
+#
+# To activate, enable "Require review from Code Owners" in the main branch's
+# protection rules at:
+#   https://github.com/CarlosGalindo2807/compute-terminal/settings/branches
+
+# ───────────────────────────────────────────────────────────────────
+# Methodology lock — the contract that makes the index licensable
+# ───────────────────────────────────────────────────────────────────
+
+# Published methodology constant + version + formulas
+/packages/shared/src/methodology.ts                     @CarlosGalindo2807
+
+# The lock test that prevents silent drift
+/apps/workers/src/functions/methodology.test.ts         @CarlosGalindo2807
+
+# The function that writes index_values_daily.vwap
+/apps/workers/src/functions/index-calculator.ts         @CarlosGalindo2807
+
+# Outlier classification — same logic gate, deserves the same scrutiny
+/apps/workers/src/functions/outlier-detector.ts         @CarlosGalindo2807
+
+# ───────────────────────────────────────────────────────────────────
+# Database migrations — schema changes need eyes
+# ───────────────────────────────────────────────────────────────────
+
+/packages/db/migrations/                                 @CarlosGalindo2807
+
+# ───────────────────────────────────────────────────────────────────
+# Methodology surface (what the public reads)
+# ───────────────────────────────────────────────────────────────────
+
+/apps/web/app/methodology/                               @CarlosGalindo2807
+
+# ───────────────────────────────────────────────────────────────────
+# Index Architect itself — changes to its charter need review
+# ───────────────────────────────────────────────────────────────────
+
+/.claude/agents/index-architect.md                       @CarlosGalindo2807
+
+# ───────────────────────────────────────────────────────────────────
+# Decision log — historical record of locked-in technical calls
+# ───────────────────────────────────────────────────────────────────
+
+/docs/decisions.md                                       @CarlosGalindo2807
