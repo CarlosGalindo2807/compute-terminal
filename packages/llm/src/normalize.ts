@@ -68,7 +68,7 @@ export async function normalizeWithLlm(
       { type: 'text', text: RULES },
       // Cache the heavy block; first call writes the cache, rest read from it.
       { type: 'text', text: catalogBlock, cache_control: { type: 'ephemeral' } },
-    ] as never,
+    ],
     messages: [{ role: 'user', content: `Resolve this raw GPU string: "${rawString}"` }],
   });
 
