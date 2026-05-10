@@ -16,7 +16,7 @@ This is the working punch list. Status of *closed* items lives in `docs/decision
 
 ## B. Things the published methodology needs but doesn't have yet
 
-- [ ] **B6 · Time-series chart on `/index/[slug]`**. Currently shows a tabular history. Need a 90-day VWAP line chart with a watermark "v1.0 · filtered_vwap". This is what someone evaluating the index expects to see first.
+- [x] ~~B6 · Time-series chart on `/index/[slug]`~~ — shipped 2026-05-11, pure-RSC SVG with watermark + future-proof methodology-change markers (see `docs/decisions.md`).
 - [ ] **B7 · Name the Index Committee members**. Today `methodology_versions.approved_by` reads "Index Committee — founding charter". For citability, name the actual members (even if it's only Carlos in v1.0). One-line UPDATE statement.
 - [ ] **B8 · Notice page for proposed changes**. The committee policy says "30 days public notice". There's currently no surface for those notices. Add a section to `/methodology` that lists `methodology_changes` rows with `effective_from` in the future.
 - [ ] **B9 · Compliance pack PDF**. Auto-generated monthly: the formula, snapshots used, outliers excluded with reason, reliability scores per provider. Generate via the daily-brief generator infrastructure. This is what a fund/exchange asks for to audit the index.

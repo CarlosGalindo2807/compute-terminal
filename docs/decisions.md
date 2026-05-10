@@ -141,6 +141,22 @@ Non-obvious calls made during the v0 build. Each entry: what / why / what we'd r
 
 **Reconsider if:** the SDK ships a breaking change to `messages.create` request shape that touches our two callsites — both are simple text-in / JSON-out so this is unlikely.
 
+## /index/[slug] chart is server-rendered SVG, no chart library (added 2026-05-11)
+
+**What:** `apps/web/components/index-chart.tsx` is a pure React Server Component that emits a single 880×340 SVG. It carries the line + gradient area + 4-tick Y axis + 5-tick X axis + watermark + (future) methodology-change markers. No `recharts`, `nivo`, `visx`, `d3`, or client-side hydration.
+
+**Why:** The page is a benchmark publication, not an interactive dashboard. Tooltips and crosshairs are nice-to-haves; a watermark stamp + reproducibility from `index_values_daily` is the load-bearing requirement. A chart library would have added 60–120 KB to first-load JS for a page that scrolls more than it interacts. Inline SVG keeps `/index/[slug]` rendering at the same first-load size as the rest of the site and means every chart is a pure function of the locked methodology.
+
+**Methodology-change markers:** when adjacent rows in `index_values_daily` carry different `methodology_version`, the chart draws a dashed yellow vertical line with the new version label. Today this never fires (v1.0 only) but the visual contract is what proves to a future reader that a committee approval actually changed the math, not just the docs.
+
+**Reconsider if:** customers ask for hover-tooltips with per-day VWAP / N / providers — that's the natural moment to either (a) add a small client-side overlay that decorates the existing SVG, or (b) move to `visx` (lightest of the libs). Don't do it speculatively.
+
+## Lambda Labs domain migration (added 2026-05-11)
+
+**What:** `lambdalabs.com` returns 404 across the marketing tree as of 2026-Q2. Lambda's pricing page now lives at `lambda.ai/service/gpu-cloud` with the same path. `scrape-lambda_labs` (Inngest function id retained) points at the new host.
+
+**Why memory:** the domain change isn't documented anywhere visible, and the `lambdalabs.com` redirect is *not* in place — the legacy host genuinely 404s rather than serving a 301. If we ever revive the Python scraper for local backfill, that file's `URL` constant needs the same edit (`apps/scrapers/providers/lambda_labs/scraper.py`).
+
 ## Thin admin auth (env-listed emails) instead of role tables
 
 **What:** `lib/auth.ts` checks `email ∈ process.env.ADMIN_EMAILS`.
