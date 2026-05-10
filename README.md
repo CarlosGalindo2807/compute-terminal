@@ -84,10 +84,13 @@ See **`docs/handoff.md`** for the complete first-time checklist (Supabase projec
 
 ## Docs
 
+- **[`docs/how-it-works.md`](./docs/how-it-works.md) — plain-English walk-through with diagrams. Start here if you're new.**
 - [`docs/architecture.md`](./docs/architecture.md) — high-level data flow
 - [`docs/data-model.md`](./docs/data-model.md) — every table, every column, why it exists
 - [`docs/flywheel.md`](./docs/flywheel.md) — how the system learns
 - [`docs/decisions.md`](./docs/decisions.md) — non-obvious technical choices and why
+- [`docs/research/`](./docs/research/README.md) — Index Architect agent's working dossier (notes, gaps, proposals)
+- [`.claude/agents/index-architect.md`](./.claude/agents/index-architect.md) — the agent's charter and hard limits
 
 ## License
 
