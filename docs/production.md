@@ -7,8 +7,8 @@ System is deployed and runs 24/7 without any local process. This is what's where
 ```
                                            ┌──────────────────────────────┐
                                            │   GitHub                     │
-                                           │   carlosgalindo2807/         │
-                                           │   compute-terminal (private) │
+                                           │   CarlosGalindo2807/         │
+                                           │   compute-terminal (public)  │
                                            └──────────────┬───────────────┘
                                                           │ git push
                                                           ▼

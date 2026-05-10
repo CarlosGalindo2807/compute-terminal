@@ -33,3 +33,7 @@ venv/
 Thumbs.db
 
 .vercel
+
+# Claude Code per-session permission allowlist — local, do not commit
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
