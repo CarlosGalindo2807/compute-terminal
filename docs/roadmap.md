@@ -8,11 +8,11 @@ This is the working punch list. Status of *closed* items lives in `docs/decision
 
 ## A. Quick wins (1-2h each)
 
-- [x] ~~A1 · Fix RunPod + Lambda scrapers~~ — shipped 2026-05-11, both are TS-native (see `docs/decisions.md`).
+- [x] ~~A1 · Fix RunPod + Lambda scrapers~~ — RunPod TS-native + saving in prod since 2026-05-11. Lambda's `lambda.ai` host sits behind Cloudflare bot-fight that 404s Vercel function IPs; the cron is disabled. Revival path: deploy Railway worker that runs the existing python scraper with its Playwright fallback (browser fingerprint passes Cloudflare, stable IPs). Tracked separately as a Section C item once Railway lands.
 - [x] ~~A2 · Move Vercel functions to `fra1`~~ — shipped 2026-05-11 via `apps/web/vercel.json`.
 - [x] ~~A3 · Drop `force-dynamic` from `/markets`~~ — shipped 2026-05-11, ISR via `revalidate = 30`.
 - [x] ~~A4 · Bump `@anthropic-ai/sdk`~~ — shipped 2026-05-11, 0.40 → 0.95.1, `as never` casts removed.
-- [ ] **A5 · Add `BRAVE_SEARCH_API_KEY`** to enable `provider-discovery`. Without it the cron runs nightly and no-ops. Brave free tier (2000 queries/mo) is plenty for daily discovery. *User action: provision key, then `vercel env add BRAVE_SEARCH_API_KEY` (use `scripts/fix-vercel-env-bom.mjs` for the upload to avoid BOM contamination).*
+- [ ] **A5 · Add `BRAVE_SEARCH_API_KEY`** to enable `provider-discovery`. Without it the cron runs nightly and no-ops. Brave free tier (2000 queries/mo) is plenty for daily discovery. **The pipeline was hardened on 2026-05-11** (SSRF block, no-redirect, TLD allowlist, candidate cap 5/run, prompt-injection guard) so it's safe to flip on — see `docs/decisions.md`. *User action: provision key, then `vercel env add BRAVE_SEARCH_API_KEY` (use `scripts/fix-vercel-env-bom.mjs` for the upload to avoid BOM contamination).*
 
 ## B. Things the published methodology needs but doesn't have yet
 
@@ -29,6 +29,7 @@ This is the working punch list. Status of *closed* items lives in `docs/decision
 - [ ] **C13 · Bump Supabase to Pro**. Free tier has no point-in-time recovery. The day we have customer-citable data in there, ~$25/mo for PITR + larger DB is non-negotiable.
 - [ ] **C14 · Wire Sentry + Axiom**. Documented as chosen, not actually wired. Without these the silent half-failures (index-calculator skipping a day, normalize-unmatched dropping rows) are invisible.
 - [ ] **C15 · Webhook to a private channel on every `methodology_changed` event**. Belt-and-braces — even though the methodology can only change via human committee, an unexpected `methodology_changed` event in `system_events` should page somebody.
+- [ ] **C16 · Deploy Railway worker for Cloudflare-protected scrapers**. lambda.ai 404s any fetch from Vercel-fra1 IP range. The python scraper at `apps/scrapers/providers/lambda_labs/scraper.py` has a Playwright fallback specifically for this; running it from Railway gets browser-grade TLS fingerprint + a stable IP that Cloudflare won't bot-fight. Same path will be needed for AWS / GCP / Azure scrapers (D16). Bridge today: `scrapeLambda` is unregistered in `apps/workers/src/inngest/config.ts`. Re-register once Railway is live.
 
 ## D. Strategic — moves the thesis (weeks, not hours)
 

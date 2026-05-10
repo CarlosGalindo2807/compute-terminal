@@ -16,7 +16,9 @@ from bs4 import BeautifulSoup
 from core.base_scraper import BaseScraper, ScrapedListing
 from core.logger import get_logger
 
-URL = "https://lambdalabs.com/service/gpu-cloud"
+# Lambda renamed lambdalabs.com -> lambda.ai in 2026; the legacy host returns
+# a hard 404 (no redirect). The pricing path is unchanged.
+URL = "https://lambda.ai/service/gpu-cloud"
 PRICE_RE = re.compile(r"\$([0-9]+\.[0-9]+)\s*/?\s*(?:hour|hr|h)", re.IGNORECASE)
 GPU_HINT_RE = re.compile(r"(H100|H200|B200|A100|A6000|L40S|MI300X|GB200)[\w\-\s]*", re.IGNORECASE)
 
