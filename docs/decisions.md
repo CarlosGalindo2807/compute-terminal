@@ -95,6 +95,26 @@ Non-obvious calls made during the v0 build. Each entry: what / why / what we'd r
 
 **Why not the same for Node:** Node has `NODE_OPTIONS=--use-system-ca` which is the equivalent. We document this in handoff.md.
 
+## Tighten RLS to all 19 public-schema tables (added 2026-05-10)
+
+**What:** Migration `010_rls_public_tables.sql` enables RLS on every table in the public schema. Public-read policies on the 8 tables that are meaningfully public (catalog + index values + methodology audit trail). Conditional public read on `generated_content` (`status = 'published'` only). No anon/authenticated policy on the 6 internal tables (`system_events`, `system_health_metrics`, `unmatched_listings`, `provider_candidates`, `index_methodology_experiments`, `_migrations`) — RLS-on-with-no-policy means only the service role can touch them.
+
+**Why:** v0 had RLS only on the 4 user-scoped tables (007_rls.sql) because reads happened exclusively server-side via the service role. That's safe today but a single misuse of the anon key in browser code would expose internal tables. Defense in depth costs nothing here because the service role bypasses RLS by default — frontend pages and Inngest workers all use `getServiceClient()` from `packages/db` and remain unaffected.
+
+**How verified:** After applying, confirmed via `pg_tables.rowsecurity = true` for all 19 tables and `pg_policies` count = 15 (4 prior user-scoped + 8 public reads + 1 published-content + 0 on internal tables).
+
+**Reconsider if:** the frontend ever needs the anon key in the browser to query internal tables (don't — that's exactly the leak this migration prevents). Or if a licensee program needs read-only access to internal experiment data; then add a `licensee` Postgres role with explicit policies, don't downgrade to anon.
+
+## Vercel env vars BOM contamination (added 2026-05-10)
+
+**What happened:** On 2026-05-08 the env-upload flow (vercel env add via REST POST /v10/projects/{id}/env) wrote `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `ANTHROPIC_API_KEY` with a UTF-8 BOM (0xFEFF / char 65279) prefixed. Symptom: every Vercel function query to Supabase timed out at 7s, /markets rendered empty, dynamic slug pages returned 404 on existing rows, scrape-vast threw `provider vast not seeded`, Inngest cloud wrote zero events for ~24 hours despite the dashboard showing fired runs.
+
+**Diagnosis tool:** `apps/web/app/api/health/route.ts` returns `supabase_host`, key fingerprints (length + first 6 chars + numeric char codes), and four canary Supabase probes with per-query timing. Hit `https://compute-terminal.vercel.app/api/health` to triage Vercel-vs-Supabase env mismatches in one request.
+
+**Fix tool:** `scripts/fix-vercel-env-bom.mjs` reads the local `.env` (verified BOM-free), lists Vercel env vars via REST, PATCHes contaminated target vars. Restricts to `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` — explicitly excludes `INNGEST_SIGNING_KEY` / `INNGEST_EVENT_KEY` because Vercel stores the integration-managed JWT-format keys (~1.2 KB) and overwriting with our local dev keys would break cloud signing.
+
+**Don't:** use `vercel env add` from PowerShell stdin (uploads empty values) or paste env values from editors that auto-add BOM. Use the script.
+
 ## Thin admin auth (env-listed emails) instead of role tables
 
 **What:** `lib/auth.ts` checks `email ∈ process.env.ADMIN_EMAILS`.
