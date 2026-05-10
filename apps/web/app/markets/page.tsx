@@ -3,7 +3,6 @@ import { Sparkline } from '@/components/sparkline';
 import { formatPrice, formatPctChange } from '@compute-terminal/shared/formatters';
 import { getServiceClient } from '@/lib/supabase-server';
 
-export const dynamic = 'force-dynamic';
 export const revalidate = 30;
 
 interface Row {
