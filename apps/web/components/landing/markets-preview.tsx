@@ -3,6 +3,7 @@
 // queries Supabase + ISR-revalidates every 30 s.
 
 import { Sparkline } from './sparkline';
+import { loadCoverageStats, fmtCount } from './data';
 
 type Row = { g: string; s: string; p: number; d: number; lo: number; hi: number; n: number; r: number };
 
@@ -32,7 +33,8 @@ function Dots({ n }: { n: number }) {
   );
 }
 
-export function MarketsPreview() {
+export async function MarketsPreview() {
+  const coverage = await loadCoverageStats();
   return (
     <section className="section" id="markets">
       <div className="section-tag">02 · /markets — the daily-driver view</div>
@@ -115,17 +117,17 @@ export function MarketsPreview() {
       </div>
 
       <div className="coverage">
-        <b>10 providers</b>
+        <b>{coverage.providers} providers</b>
         <span className="divider" />
-        <b>28 GPU models</b>
+        <b>{coverage.gpus} GPU models</b>
         <span className="divider" />
-        <b>4.2M snapshots</b>
+        <b>{fmtCount(coverage.snapshots)} snapshots</b>
         <span>since launch</span>
         <span className="divider" />
-        <b>99.7%</b>
+        <b>{coverage.uptimePct}</b>
         <span>scraper uptime · 30d</span>
         <span className="divider" />
-        <b>5-min</b>
+        <b>{coverage.cadence}</b>
         <span>refresh cadence</span>
       </div>
     </section>
