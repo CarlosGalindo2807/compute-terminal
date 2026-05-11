@@ -7,7 +7,14 @@ import { indexCalculator } from '../functions/index-calculator';
 import { normalizeUnmatched } from '../functions/normalize-unmatched';
 import { outlierDetector } from '../functions/outlier-detector';
 import { providerDiscovery } from '../functions/provider-discovery';
-import { recordSystemMetrics } from '../functions/record-system-metrics';
+// recordSystemMetrics is intentionally NOT registered as of migration 012.
+// The same job runs inside Postgres now via pg_cron — see
+// packages/db/migrations/012_pg_cron_observability.sql and the
+// `record_system_metrics_hourly` schedule on cron.job. Removes the Inngest
+// round-trip per hour and the dependency on Inngest cloud being up for the
+// most basic observability metric write. The TS implementation under
+// functions/record-system-metrics.ts stays in the repo as the rollback path:
+// re-add it to this array if pg_cron has to be unwound.
 import { scrapeRunpod, scrapeVast } from '../functions/scrapers';
 import { inngest } from './client';
 
@@ -27,7 +34,6 @@ export const functions = [
   scrapeRunpod,
   outlierDetector,
   normalizeUnmatched,
-  recordSystemMetrics,
   indexCalculator,
   providerDiscovery,
   contentGenerator,
