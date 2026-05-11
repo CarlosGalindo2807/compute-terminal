@@ -1,25 +1,17 @@
-// /markets teaser — 12 rows, intentionally a demo so the landing renders in
-// 0 ms with no DB call. Real markets table lives at /markets, which already
-// queries Supabase + ISR-revalidates every 30 s.
+// /markets teaser — top GPUs by activity in the last 24h, real data.
+// Falls back to a 6-row demo set if Supabase returns nothing (e.g. fresh
+// install) so the landing never renders an empty table.
 
 import { Sparkline } from './sparkline';
-import { loadCoverageStats, fmtCount } from './data';
+import { loadCoverageStats, loadMarketsTop, fmtCount, type MarketsRow } from './data';
 
-type Row = { g: string; s: string; p: number; d: number; lo: number; hi: number; n: number; r: number };
-
-const ROWS: Row[] = [
-  { g: 'H100', s: '80 GB · SXM5', p: 2.143, d: -1.2, lo: 1.92, hi: 2.78, n: 9, r: 0.94 },
-  { g: 'H200', s: '141 GB · SXM5', p: 3.42, d: 0.7, lo: 3.05, hi: 4.1, n: 7, r: 0.91 },
-  { g: 'B200', s: '180 GB · SXM6', p: 5.81, d: 2.1, lo: 5.1, hi: 6.42, n: 4, r: 0.86 },
-  { g: 'A100', s: '80 GB · SXM4', p: 1.18, d: -0.3, lo: 0.94, hi: 1.51, n: 10, r: 0.96 },
-  { g: 'A100', s: '40 GB · PCIe', p: 0.92, d: -0.4, lo: 0.78, hi: 1.2, n: 8, r: 0.93 },
-  { g: 'L40S', s: '48 GB · PCIe', p: 0.78, d: -0.9, lo: 0.61, hi: 0.99, n: 7, r: 0.9 },
-  { g: 'MI300X', s: '192 GB · OAM', p: 2.61, d: 1.4, lo: 2.24, hi: 3.18, n: 5, r: 0.83 },
-  { g: 'V100', s: '32 GB · SXM2', p: 0.34, d: 0, lo: 0.28, hi: 0.42, n: 6, r: 0.88 },
-  { g: 'A6000', s: '48 GB · PCIe', p: 0.51, d: -0.1, lo: 0.41, hi: 0.68, n: 9, r: 0.92 },
-  { g: 'RTX PRO 6000', s: '96 GB · Blackwell', p: 0.42, d: 0, lo: 0.39, hi: 0.51, n: 3, r: 0.79 },
-  { g: 'RTX 4090', s: '24 GB', p: 0.27, d: -0.6, lo: 0.22, hi: 0.38, n: 9, r: 0.85 },
-  { g: 'RTX 5090', s: '32 GB', p: 0.49, d: 1.2, lo: 0.41, hi: 0.62, n: 6, r: 0.81 },
+const FALLBACK_ROWS: MarketsRow[] = [
+  { g: 'H100', s: '80 GB · SXM5', p: 2.14, d: -1.2, lo: 1.92, hi: 2.78, n: 9, r: 0.94, seed: 1 },
+  { g: 'H200', s: '141 GB · SXM5', p: 3.42, d: 0.7, lo: 3.05, hi: 4.1, n: 7, r: 0.91, seed: 2 },
+  { g: 'B200', s: '180 GB · SXM6', p: 5.81, d: 2.1, lo: 5.1, hi: 6.42, n: 4, r: 0.86, seed: 3 },
+  { g: 'A100', s: '80 GB · SXM4', p: 1.18, d: -0.3, lo: 0.94, hi: 1.51, n: 10, r: 0.96, seed: 4 },
+  { g: 'L40S', s: '48 GB · PCIe', p: 0.78, d: -0.9, lo: 0.61, hi: 0.99, n: 7, r: 0.9, seed: 5 },
+  { g: 'A6000', s: '48 GB · PCIe', p: 0.51, d: -0.1, lo: 0.41, hi: 0.68, n: 9, r: 0.92, seed: 6 },
 ];
 
 function Dots({ n }: { n: number }) {
@@ -34,7 +26,10 @@ function Dots({ n }: { n: number }) {
 }
 
 export async function MarketsPreview() {
-  const coverage = await loadCoverageStats();
+  const [coverage, liveRows] = await Promise.all([loadCoverageStats(), loadMarketsTop(12)]);
+  const rows = liveRows.length >= 4 ? liveRows : FALLBACK_ROWS;
+  const isLive = liveRows.length >= 4;
+
   return (
     <section className="section" id="markets">
       <div className="section-tag">02 · /markets — the daily-driver view</div>
@@ -58,7 +53,7 @@ export async function MarketsPreview() {
           <span className="pill on">$/hr</span>
           <span className="pill">$/Mtok</span>
           <span className="pill">EU-only</span>
-          <span>· 28 SKUs</span>
+          <span>· {coverage.gpus} SKUs</span>
         </div>
         <table className="mk">
           <thead>
@@ -74,8 +69,8 @@ export async function MarketsPreview() {
             </tr>
           </thead>
           <tbody>
-            {ROWS.map((row, i) => (
-              <tr key={`${row.g}-${row.s}`}>
+            {rows.map((row, i) => (
+              <tr key={`${row.g}-${row.s}-${i}`}>
                 <td>
                   <span className="gpu-name">{row.g}</span>
                   <span className="gpu-spec">{row.s}</span>
@@ -93,7 +88,7 @@ export async function MarketsPreview() {
                   {row.lo.toFixed(2)} — {row.hi.toFixed(2)}
                 </td>
                 <td style={{ color: 'var(--ink-dim)' }}>
-                  <Sparkline seed={i * 13 + 5} ariaLabel={`${row.g} 24h`} />
+                  <Sparkline seed={row.seed} ariaLabel={`${row.g} 24h`} />
                 </td>
                 <td>
                   <span style={{ color: 'var(--ink)' }}>{row.n}</span>
@@ -114,6 +109,20 @@ export async function MarketsPreview() {
             ))}
           </tbody>
         </table>
+        {!isLive ? (
+          <div
+            style={{
+              padding: '10px 18px',
+              borderTop: '1px solid var(--line)',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10.5,
+              letterSpacing: '0.06em',
+              color: 'var(--ink-mute)',
+            }}
+          >
+            REFERENCE · live data resumes when scrapers catch up
+          </div>
+        ) : null}
       </div>
 
       <div className="coverage">
@@ -125,7 +134,7 @@ export async function MarketsPreview() {
         <span>since launch</span>
         <span className="divider" />
         <b>{coverage.uptimePct}</b>
-        <span>scraper uptime · 30d</span>
+        <span>uptime · {coverage.uptimeWindow}</span>
         <span className="divider" />
         <b>{coverage.cadence}</b>
         <span>refresh cadence</span>
