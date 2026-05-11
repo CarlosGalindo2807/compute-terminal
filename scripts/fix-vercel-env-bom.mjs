@@ -34,6 +34,18 @@ const TARGET_VARS = [
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'ANTHROPIC_API_KEY',
+  // Sentry — added 2026-05-11. Both SENTRY_DSN (server) and NEXT_PUBLIC_SENTRY_DSN
+  // (client) hold the same DSN value. SENTRY_AUTH_TOKEN is used at build time
+  // by withSentryConfig to upload source maps. SENTRY_ORG/PROJECT/PUBLIC_KEY
+  // are non-secret but go on the env for completeness.
+  'SENTRY_DSN',
+  'NEXT_PUBLIC_SENTRY_DSN',
+  'SENTRY_AUTH_TOKEN',
+  'SENTRY_ORG',
+  'SENTRY_PROJECT',
+  'SENTRY_PUBLIC_KEY',
+  'SENTRY_OTLP_TRACES_URL',
+  'SENTRY_VERCEL_LOG_DRAIN_URL',
 ];
 
 const dryRun = process.argv.includes('--dry-run');
