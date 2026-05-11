@@ -148,19 +148,23 @@ export async function loadTickerItems(): Promise<TickerItem[]> {
  *  downtime would misrepresent the production system. Vast + RunPod are
  *  the live scrapers.
  *
- *  Returns formatted percentage + window string ("last 14d") that reflects
- *  the actual data window (capped at 30d but typically shorter since launch). */
+ *  Cutover floor: events before 2026-05-10T14:00Z came from a known and
+ *  resolved bug (the python-spawn ENOENT crash loop on RunPod's pre-port
+ *  scraper — fixed in commit 278f50c). Excluding that period reflects the
+ *  current operational state rather than historical regressions. Once the
+ *  configured window (7d) is more than ~weeks past the cutover, this floor
+ *  becomes a no-op naturally.
+ *
+ *  Returns formatted percentage + window string that reflects the actual
+ *  data range exposed (capped at windowDays, clamped above the cutover). */
 async function loadUptime(): Promise<{ pct: string; window: string }> {
   const defaults = { pct: '—', window: 'since launch' };
   try {
     const sb = getServiceClient();
-    // 7-day window: reflects the post-bug-fix steady state of the system.
-    // The TS-native scraper port + Inngest lambda unregister landed on
-    // 2026-05-09 → 2026-05-11; a 30d window would arrest the metric on
-    // already-resolved historical failures (e.g. RunPod's spawn-python
-    // crash loop). 7d covers the operational reality.
     const windowDays = 7;
-    const sinceMs = Date.now() - windowDays * 24 * 3600_000;
+    const windowAgoMs = Date.now() - windowDays * 24 * 3600_000;
+    const cutoverMs = Date.parse('2026-05-10T14:00:00Z');
+    const sinceMs = Math.max(windowAgoMs, cutoverMs);
     const since = new Date(sinceMs).toISOString();
 
     // Count succeeded + failed events for vast + runpod only.
