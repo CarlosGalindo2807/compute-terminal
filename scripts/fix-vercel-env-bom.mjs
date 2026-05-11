@@ -46,6 +46,21 @@ const TARGET_VARS = [
   'SENTRY_PUBLIC_KEY',
   'SENTRY_OTLP_TRACES_URL',
   'SENTRY_VERCEL_LOG_DRAIN_URL',
+  // PostHog — added 2026-05-11. Both are NEXT_PUBLIC_* so they ship to
+  // the client bundle. Provisioned by the Vercel Marketplace integration.
+  'NEXT_PUBLIC_POSTHOG_KEY',
+  'NEXT_PUBLIC_POSTHOG_HOST',
+  // Stripe — added 2026-05-11. STRIPE_SECRET_KEY is server-only.
+  // STRIPE_PRICE_PRO/TEAM are runtime-resolved per checkout; keep them
+  // env-controlled so we can swap test ↔ live without redeploying code.
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_PRICE_PRO',
+  'STRIPE_PRICE_TEAM',
+  'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+  // AI Gateway — added 2026-05-11 (commit bb996d3). Routes Claude calls
+  // through gateway when present; falls back to ANTHROPIC_API_KEY when absent.
+  'AI_GATEWAY_API_KEY',
 ];
 
 const dryRun = process.argv.includes('--dry-run');
