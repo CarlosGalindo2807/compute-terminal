@@ -1,7 +1,7 @@
 # Gap matrix — IOSCO Principles for Financial Benchmarks vs CTI v1.0
 
 **Living document.** Updated in place as our state changes. Latest revision:
-2026-05-10 (initial population by index-architect).
+2026-05-11 (P7 row refined after the listings-vs-transactions deep-dive).
 
 **Companion note:** [`docs/research/notes/2026-05-10-iosco-principles-applied-to-cti.md`](../notes/2026-05-10-iosco-principles-applied-to-cti.md)
 — full prose, citations, and reasoning behind every row below.
@@ -35,7 +35,7 @@
 | # | Principle | CTI status | Evidence today | Specific gap | Priority | Owner / Action |
 |---|---|---|---|---|---|---|
 | P6 | Benchmark design | compliant | Filtered VWAP weighted by `num_gpus`, MAD-3σ outlier filter, eligibility floor (`reliability_score ≥ 0.5`), quorum (`min_observations ≥ 5`), all on `/methodology` and locked in `packages/shared/src/methodology.ts`. No expert judgment. | None substantive — design is defensible. | — | Maintain. Re-evaluate at each quarterly review (P10). |
-| P7 | Data sufficiency | partial / **structurally weak** | All inputs anchored in arms-length supply/demand interactions (provider listings + customer demand → published asks). 24h rolling window, ≥ 6 providers when fully ramped. | Inputs are **listings**, not observed trades. Strict P7 reading requires "anchored by observable transactions". On-demand cloud compute has no public consolidated tape. | P0 (but slow) | Dedicated research note `<date>-listings-vs-transactions.md`; consider self-classifying as a listed-price benchmark with stated limitations (LBMA-Gold-fixing pattern). |
+| P7 | Data sufficiency | partial — exposure is **disclosure, not design** (re-assessed 2026-05-11) | All inputs are standing, public, **executable** offers from multiple independent sellers — top of the IOSCO non-transaction tier (committed-quote-equivalent), zero expert judgment. 24h rolling window; ≥ 6 providers targeted when fully ramped. | No transaction tape exists for on-demand GPU compute (none can be obtained — compute futures don't exist yet). No demand-side input (asks only, never bids). `/methodology` does not disclose the listing-vs-transaction nature or the data hierarchy → IOSCO P9/P11 omission. Per-GPU prints can still rest on a single provider some days (`min_observations ≥ 5` counts observations, not providers). | P0 (Move 1 is fast) | **Done:** research note [`2026-05-11-listings-vs-transactions-data-sufficiency.md`](../notes/2026-05-11-listings-vs-transactions-data-sufficiency.md) — concludes IOSCO Oil PRA Principles + EU BMR Art. 11 already recognise offer-anchored benchmarks; the fix is disclosure + breadth, not a new data source. **Next: (Move 1)** file a `/methodology` proposal adding a "what the index measures / data hierarchy / limitations" section (docs-only, no number change). **(Move 2)** proposal to add a distinct-provider floor to quorum (methodology change → 90-day backtest + 30-day notice). **(Move 3)** start capturing demand-side proxies (`time_remaining`, sold-out flags) — infra-only, roadmap item. |
 | P8 | Hierarchy of data inputs | partial | Hierarchy exists in code (rule → alias → fuzzy → Claude ≥ 0.95 auto → Claude 0.70–0.95 admin queue → outlier check → eligibility check → VWAP). Zero expert judgment in published-number path. | Hierarchy is implicit, not published. | P1 | Add "Hierarchy of data inputs" subsection to `/methodology` listing each ingestion stage and the deterministic rule. |
 | P9 | Transparency of benchmark determinations | partial | `/index/[slug]` shows daily values; `index_values_daily` carries `methodology_version`; provenance is reproducible from `price_snapshots`. | Per-day diagnostics (`numObservations`, providers contributing, outliers excluded, reliability scores) not surfaced on the public page. | P1 | Roadmap B9 — compliance-pack PDF; per-day audit card. |
 | P10 | Periodic review | partial | Charter on `/methodology` mandates quarterly Committee review of 90 days of research output. | First review not yet executed (due ~2026-07-29). No template defined. | P1 | Define `docs/research/reviews/<period>.md` template before the first review. |
@@ -69,7 +69,7 @@ Ordered by effort × leverage. P0 first, then P1, with the dependent items group
 1. P3 / P5 — Conflict-of-interest disclosure + single-administrator declaration on `/methodology`. *Half-day docs work.*
 2. P1 — Name the founding Committee member (Roadmap B7). *Five-minute UPDATE.*
 3. P16 — Publish complaints email + SLA on `/methodology`. *Half-day docs work, dependent on email mailbox.*
-4. P7 — Listings-vs-transactions research note. *One-day research; conclusion may be "self-classify as listed-price benchmark, document limitation".*
+4. P7 — ~~Listings-vs-transactions research note~~ **done 2026-05-11** ([note](../notes/2026-05-11-listings-vs-transactions-data-sufficiency.md)). Remaining P0: file the "Move 1" `/methodology` disclosure proposal (what the index measures + data hierarchy + limitations; docs-only, no number change). *Half-day to draft the proposal.*
 
 **P1 (do these before audit-readiness conversation):**
 5. P2 — Third-party dependency map.
@@ -104,3 +104,4 @@ filename — it should always be the current state of the matrix.
 ### Revision log
 
 - **2026-05-10** — Initial population. 19 rows × 4 categories. 5 rows P0, 11 rows P1, 1 row P2, 2 rows n/a. One row each (P11, P6) `compliant`. (index-architect first run.)
+- **2026-05-11** — P7 row re-assessed after the listings-vs-transactions deep-dive ([note](../notes/2026-05-11-listings-vs-transactions-data-sufficiency.md)). Finding: IOSCO Oil PRA Principles and EU BMR Art. 11 already recognise offer/quote-anchored benchmarks where no transaction tape exists; CTI's exposure is *under-disclosure on `/methodology`*, not the design itself. Action split into Move 1 (fast `/methodology` disclosure proposal — still P0), Move 2 (distinct-provider quorum floor — methodology change), Move 3 (demand-side proxy capture — infra). Priority-queue item 4 updated accordingly. (index-architect second run.)
