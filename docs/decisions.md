@@ -177,6 +177,26 @@ That said, before flipping `BRAVE_SEARCH_API_KEY` on, we widened the moat betwee
 
 **Reconsider if:** we ever automate "approve and onboard" without human review (don't). Or if the TLD allowlist starts blocking legitimate candidates — broaden the set, never disable the gate.
 
+## Pivot to "Bloomberg for buyers" framing after Silicon Data discovery (added 2026-05-11)
+
+**What:** REFRAME_v2.md (root) and docs/three-product-lines.md land the public framing change. CTI is the *application / observability / decision layer* on top of the compute market for buyers — CTOs, Heads of Infra, CFOs of AI scaleups paying 50-500k€/mo. Silicon Data (Carmen Li ex-Bloomberg, backed by DRW + Jump) already occupies the institutional-reference slot with SDH100RT/SDA100RT/SDB200RT distributed via Bloomberg/Refinitiv. We do not compete for that slot.
+
+**Why:** Three differentiators the institutional index cannot adopt without breaking fungibility for derivatives — and that the buyer needs:
+  (1) tokens-equivalents (`$/M-tokens-Claude-Sonnet`, not `$/H100-hour`),
+  (2) EU-compliance sub-indices (CTI-H100-EU, CTI-H100-Spain, CTI-H100-Sovereign),
+  (3) behavioral pricing (real paid prices vs published, segmented by spend band — moat by network effect).
+Sequenced into three product lines (L1 Terminal → L2 Hedging-as-a-Service → L3 Marketplace OTC); KPIs and triggers in `docs/three-product-lines.md`.
+
+**What stays:** filtered_vwap v1.0, `methodology_versions`/`methodology_changes` audit, /methodology + /index/[slug], watermarked SVG chart, Index Architect cloud routine. Same artifact, repurposed as the *rigor signal* underneath the buyer-facing terminal — not the headline product.
+
+**What's new in this commit:** migration `011_pivot_v2_schema.sql` adds `provider_compliance` (var 3), `throughput_benchmarks` (var 1), `invoice_observations` (var 8), `forward_curves` (L2 internal). Endpoint `/api/v1/cost-per-workload` is the first public surface of variable 1 — translates `$/gpu-hour` into `$/workload-unit`. Whitepapers `docs/cti-methodology-v1.md` + `docs/competitive-positioning.md` follow in a separate commit (gated on review).
+
+**What we explicitly don't do:** license Silicon Data's feed (cost-prohibitive; not needed for our customer). The three differentiators cannot be extracted from their feed by design — that's the whole point of the differentiation.
+
+**Schema deltas worth flagging:** REFRAME_v2 specified `provider_id text` for `provider_compliance` but `providers.id` is uuid in this repo since migration 001 — used uuid + FK. REFRAME_v2 also specified `create_hypertable('invoice_observations', ...)` but Supabase removed TimescaleDB in 2024 (see "TimescaleDB over plain Postgres" entry above) — replaced with composite btree indexes. Both deviations preserve the spec's access patterns.
+
+**Reconsider if:** Silicon Data ships an end-user terminal at <500€/mo → reposition fast around the three variables (or pivot L1 to be a complement to their feed rather than a competitor). Response plan in `docs/competitive-positioning.md`.
+
 ## Thin admin auth (env-listed emails) instead of role tables
 
 **What:** `lib/auth.ts` checks `email ∈ process.env.ADMIN_EMAILS`.

@@ -1,10 +1,12 @@
 # Compute Index Terminal
 
-Real-time aggregator of GPU-hour prices across marketplaces and clouds. Bloomberg-style terminal today, settlement benchmark for compute futures tomorrow.
+Procurement and observability terminal for teams that buy AI compute — the buyer's Bloomberg, not the trader's. Real-time GPU-hour prices across every major marketplace and cloud, normalized into sub-indices (CTI-H100, CTI-Tokens-Equivalent, CTI-H100-EU) you can act on.
 
+> **Positioning:** see `REFRAME_v2.md` for the strategic framing and `docs/three-product-lines.md` for the L1 Terminal → L2 Hedging-as-a-Service → L3 Marketplace OTC sequence. We are independent from and not affiliated with Silicon Data Inc. (SDH100RT / SDA100RT / SDB200RT) — see `docs/competitive-positioning.md`.
+>
 > **Architectural non-negotiable:** every component must answer *"how does this make the system smarter tomorrow without human intervention?"* See `docs/flywheel.md`.
 >
-> **Published index methodology:** the formula is locked at v1.0 (`filtered_vwap`, MAD-3σ outlier filter, 24h window, num_gpus weight, reliability_floor=0.5). It changes only via Index Committee review — see [/methodology](https://compute-terminal.vercel.app/methodology) for the public spec and version history.
+> **Published methodology:** the formula is locked at v1.0 (`filtered_vwap`, MAD-3σ outlier filter, 24h window, num_gpus weight, reliability_floor=0.5). It changes only via Index Committee review — see [/methodology](https://compute-terminal.vercel.app/methodology) for the public spec, `docs/cti-methodology-v1.md` for the full whitepaper, and version history at the same path.
 >
 > **What's next:** the working punch list is `docs/roadmap.md`. Closed decisions live in `docs/decisions.md`.
 
