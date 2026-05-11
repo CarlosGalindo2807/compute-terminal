@@ -37,3 +37,6 @@ Thumbs.db
 # Claude Code per-session permission allowlist — local, do not commit
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Local handoff bundles from Claude Design — never commit, regenerate from source
+.handoff/
