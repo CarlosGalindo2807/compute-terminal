@@ -1,11 +1,17 @@
 // Hero section — corner marks, meta line, big serif headline, sub line with
 // caret, two CTAs, and the live ticker docked at the bottom of the viewport.
+//
+// Sub-line numbers pull from the same coverage loader that backs the markets
+// section so the two stay in lockstep. No hardcoded marketing values.
 
 import Link from 'next/link';
 import { Clock } from './clock';
 import { Ticker } from './ticker';
+import { loadCoverageStats, fmtCount } from './data';
 
-export function Hero() {
+export async function Hero() {
+  const c = await loadCoverageStats();
+
   return (
     <section className="hero">
       <div className="corner-marks">
@@ -31,7 +37,7 @@ export function Hero() {
       </h1>
 
       <p className="hero-sub">
-        Live across 10 providers · 28 GPU models · 4.2M snapshots since launch.
+        Live across {c.providers} providers · {c.gpus} GPU models · {fmtCount(c.snapshots)} snapshots since launch.
         <br />
         Independently governed index, locked methodology, tokens-equivalent pricing
         <span className="caret" />
