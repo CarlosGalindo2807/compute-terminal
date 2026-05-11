@@ -64,16 +64,19 @@ type BenchmarkRow = {
 // populated. Numbers are rough public-source ballparks for end-to-end inference
 // throughput at fp8/bf16 and small batch — replace with measured values as the
 // table fills. See docs/cti-methodology-v1.md for the calibration protocol.
+// gpu_model values must match `gpu_models.slug` for the price lookup to find
+// a 24h-median; otherwise estimates fall back to `price_source: 'no_recent_snapshots'`.
 const DEFAULT_BENCHMARKS: BenchmarkRow[] = [
-  { gpu_model: 'h100-sxm5', llm_model: 'claude-sonnet-4-5', precision: 'fp8', tokens_per_second: 5800, source: 'inline_default' },
-  { gpu_model: 'h100-pcie', llm_model: 'claude-sonnet-4-5', precision: 'fp8', tokens_per_second: 4400, source: 'inline_default' },
-  { gpu_model: 'a100-sxm4-80', llm_model: 'claude-sonnet-4-5', precision: 'bf16', tokens_per_second: 2400, source: 'inline_default' },
-  { gpu_model: 'b200', llm_model: 'claude-sonnet-4-5', precision: 'fp8', tokens_per_second: 11500, source: 'inline_default' },
-  { gpu_model: 'mi300x', llm_model: 'claude-sonnet-4-5', precision: 'fp16', tokens_per_second: 3800, source: 'inline_default' },
-  { gpu_model: 'h100-sxm5', llm_model: 'llama-3-70b', precision: 'fp8', tokens_per_second: 6400, source: 'inline_default' },
-  { gpu_model: 'a100-sxm4-80', llm_model: 'llama-3-70b', precision: 'bf16', tokens_per_second: 2700, source: 'inline_default' },
-  { gpu_model: 'h100-sxm5', llm_model: 'gpt-4o', precision: 'fp8', tokens_per_second: 5600, source: 'inline_default' },
-  { gpu_model: 'h100-sxm5', llm_model: 'mistral-large', precision: 'fp8', tokens_per_second: 5200, source: 'inline_default' },
+  { gpu_model: 'h100-sxm-80', llm_model: 'claude-sonnet-4-5', precision: 'fp8', tokens_per_second: 5800, source: 'inline_default' },
+  { gpu_model: 'h100-pcie-80', llm_model: 'claude-sonnet-4-5', precision: 'fp8', tokens_per_second: 4400, source: 'inline_default' },
+  { gpu_model: 'h200-sxm-141', llm_model: 'claude-sonnet-4-5', precision: 'fp8', tokens_per_second: 7800, source: 'inline_default' },
+  { gpu_model: 'a100-sxm-80', llm_model: 'claude-sonnet-4-5', precision: 'bf16', tokens_per_second: 2400, source: 'inline_default' },
+  { gpu_model: 'b200-sxm-192', llm_model: 'claude-sonnet-4-5', precision: 'fp8', tokens_per_second: 11500, source: 'inline_default' },
+  { gpu_model: 'mi300x-oam-192', llm_model: 'claude-sonnet-4-5', precision: 'fp16', tokens_per_second: 3800, source: 'inline_default' },
+  { gpu_model: 'h100-sxm-80', llm_model: 'llama-3-70b', precision: 'fp8', tokens_per_second: 6400, source: 'inline_default' },
+  { gpu_model: 'a100-sxm-80', llm_model: 'llama-3-70b', precision: 'bf16', tokens_per_second: 2700, source: 'inline_default' },
+  { gpu_model: 'h100-sxm-80', llm_model: 'gpt-4o', precision: 'fp8', tokens_per_second: 5600, source: 'inline_default' },
+  { gpu_model: 'h100-sxm-80', llm_model: 'mistral-large', precision: 'fp8', tokens_per_second: 5200, source: 'inline_default' },
 ];
 
 type PriceRow = { gpu_slug: string; median_usd_hour: number; n: number };
