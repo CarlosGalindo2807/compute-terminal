@@ -23,6 +23,7 @@
 
 import { NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase-server';
+import { checkRate, identifierForRequest } from '@/lib/ratelimit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -156,6 +157,23 @@ async function loadLatestPrices(gpu_slugs: string[]): Promise<Map<string, PriceR
 }
 
 export async function GET(request: Request) {
+  // Rate limit before any DB work. Upstash no-ops gracefully when env vars
+  // aren't set; once provisioned, each IP gets 60 req/min sliding window.
+  const rate = await checkRate(`cpw:${identifierForRequest(request)}`);
+  if (!rate.ok) {
+    return NextResponse.json(
+      { ok: false, error: 'rate_limited', remaining: rate.remaining, reset_at: new Date(rate.reset).toISOString() },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': String(rate.limit),
+          'X-RateLimit-Remaining': String(rate.remaining),
+          'X-RateLimit-Reset': String(rate.reset),
+        },
+      },
+    );
+  }
+
   const url = new URL(request.url);
   const model = url.searchParams.get('model');
   const workloadKey = url.searchParams.get('workload');

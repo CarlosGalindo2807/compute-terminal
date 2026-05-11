@@ -17,6 +17,8 @@
     "@stripe/stripe-js": "^9.4.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.46.1",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "clsx": "^2.1.1",
     "inngest": "^3.27.4",
     "lucide-react": "^0.469.0",
@@ -24,6 +26,7 @@
     "posthog-js": "^1.372.10",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "resend": "^6.12.3",
     "stripe": "^22.1.1",
     "tailwind-merge": "^2.5.5"
   },

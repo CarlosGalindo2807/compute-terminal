@@ -61,6 +61,15 @@ const TARGET_VARS = [
   // AI Gateway — added 2026-05-11 (commit bb996d3). Routes Claude calls
   // through gateway when present; falls back to ANTHROPIC_API_KEY when absent.
   'AI_GATEWAY_API_KEY',
+  // Resend — added 2026-05-11. RESEND_FROM is the From: address (must be on
+  // a verified sending domain). RESEND_API_KEY is the secret.
+  'RESEND_API_KEY',
+  'RESEND_FROM',
+  // Upstash Redis — added 2026-05-11. Rate limiter on /api/v1/*. Both come
+  // from the Vercel Marketplace integration; the SDK uses them directly,
+  // no further config needed.
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
 ];
 
 const dryRun = process.argv.includes('--dry-run');
