@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withSentryConfig } from '@sentry/nextjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 try {
@@ -23,4 +24,21 @@ const nextConfig = {
     serverActions: { bodySizeLimit: '2mb' },
   },
 };
-export default nextConfig;
+
+// Sentry wrapping. When SENTRY_AUTH_TOKEN is unset (local dev or before the
+// Marketplace integration is installed) the plugin still passes nextConfig
+// through unchanged; only source-map upload is skipped. Safe to ship.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  reactComponentAnnotation: { enabled: false },
+  tunnelRoute: '/monitoring',
+  disableLogger: true,
+  automaticVercelMonitors: false,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+});

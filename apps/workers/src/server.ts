@@ -1,6 +1,10 @@
 // Standalone worker server (Hono + Inngest) for local dev and Railway deploy.
 // In production, the same `functions` array is also served from apps/web/api/inngest/route.ts.
 
+// Sentry must be the very first import so its global hooks are installed
+// before anything else can throw.
+import './sentry';
+
 import { serve as serveHono } from '@hono/node-server';
 import { Hono } from 'hono';
 import { serve } from 'inngest/hono';
