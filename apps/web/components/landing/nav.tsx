@@ -1,7 +1,6 @@
-// Landing-specific top nav. Distinct from the global Nav (components/nav.tsx)
-// used by /markets, /admin, etc — that one stays unchanged so we don't
-// disturb other pages. This one carries the gold chip, ticker-style brand
-// mark, and the theme toggle.
+// Landing-specific top nav. Same styling as the global Nav but with two CTAs
+// (Sign in + Open terminal) instead of just Sign in. Identical structure
+// reuses the .cti-nav CSS rules in globals.css.
 
 import Link from 'next/link';
 import { ThemeToggle } from './theme-toggle';

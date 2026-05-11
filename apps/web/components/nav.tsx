@@ -1,24 +1,39 @@
+// Shared top nav, used by every route in the app. Styled in the same Aurum
+// vocabulary as the landing (.cti-nav rules in globals.css). Server-only —
+// the only client island is <ThemeToggle/> which flips html[data-mode].
+
 import Link from 'next/link';
+import { ThemeToggle } from './landing/theme-toggle';
 
 export function Nav() {
   return (
-    <header className="border-b border-bg-border bg-bg-surface">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-        <Link href="/" className="display text-2xl tracking-tight">
-          Compute<span className="italic text-accent">Terminal</span>
+    <header className="cti-nav">
+      <div className="cti-nav-inner">
+        <Link href="/" className="brand">
+          <span className="brand-mark" />
+          <b>COMPUTE</b>
+          <span>/</span>
+          <b>TERMINAL</b>
         </Link>
-        <nav className="flex items-center gap-6 text-sm">
-          <Link href="/markets" className="text-ink-secondary hover:text-ink-primary">Markets</Link>
-          <Link href="/index/cti-composite" className="text-ink-secondary hover:text-ink-primary">Index</Link>
-          <Link href="/methodology" className="text-ink-secondary hover:text-ink-primary">Methodology</Link>
-          <Link href="/blog" className="text-ink-secondary hover:text-ink-primary">Brief</Link>
-          <Link
-            href="/login"
-            className="rounded border border-bg-border px-3 py-1 text-ink-primary hover:border-accent hover:text-accent"
-          >
-            Sign in
+        <nav className="cti-nav-links">
+          <Link href="/markets">Markets</Link>
+          <Link href="/index/cti-h100">Indices</Link>
+          <Link href="/methodology">Methodology</Link>
+          <Link href="/blog">Brief</Link>
+          <Link href="/dashboard" style={{ color: 'var(--ink-mute)' }}>
+            Dashboard
           </Link>
         </nav>
+        <div className="cti-nav-cta">
+          <Link href="/methodology" className="chip">
+            <span className="dot" />
+            v1.0 · filtered_vwap · locked
+          </Link>
+          <ThemeToggle />
+          <Link href="/login" className="cti-btn">
+            Sign in
+          </Link>
+        </div>
       </div>
     </header>
   );
