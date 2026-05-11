@@ -1,7 +1,7 @@
-// Deterministic SVG sparkline. No random — every server render produces
-// the same path for a given seed, so hydration matches and the visual
-// stays stable across re-renders. Used in the ticker, markets table
-// preview, and the small mini-charts under the differentiator cards.
+// SVG sparkline. Accepts either a deterministic seed (for decorative texture)
+// or a real series of values (for live-data sparklines). When `values` is
+// passed it wins; otherwise an LCG seeded with `seed` produces a stable path.
+// Server-rendered — every output is deterministic so hydration matches.
 
 type Variant = 'stroke' | 'area';
 
@@ -14,7 +14,11 @@ function lcg(seed: number) {
 }
 
 interface Props {
-  seed: number;
+  seed?: number;
+  /** Real data series. When provided, overrides the seeded LCG. Any non-finite
+   *  entries are dropped before rendering; an empty effective series falls
+   *  back to seeded output. */
+  values?: readonly number[];
   width?: number;
   height?: number;
   points?: number;
@@ -23,8 +27,20 @@ interface Props {
   ariaLabel?: string;
 }
 
+function seriesFromSeed(seed: number, points: number): number[] {
+  const rng = lcg(seed * 37 + 11);
+  let v = 50 + rng() * 10;
+  const pts: number[] = [];
+  for (let i = 0; i < points; i++) {
+    v += (rng() - 0.5) * 8;
+    pts.push(v);
+  }
+  return pts;
+}
+
 export function Sparkline({
-  seed,
+  seed = 1,
+  values,
   width = 80,
   height = 16,
   points = 24,
@@ -32,20 +48,19 @@ export function Sparkline({
   className,
   ariaLabel = 'sparkline',
 }: Props) {
-  const rng = lcg(seed * 37 + 11);
-  const pts: number[] = [];
-  let v = 50 + rng() * 10;
-  for (let i = 0; i < points; i++) {
-    v += (rng() - 0.5) * 8;
-    pts.push(v);
-  }
+  const clean = (values ?? []).filter((n) => Number.isFinite(n));
+  const pts = clean.length >= 2 ? clean : seriesFromSeed(seed, points);
+  const n = pts.length;
   const min = Math.min(...pts);
   const max = Math.max(...pts);
   const range = max - min || 1;
   const d = pts
-    .map((p, i) => `${i ? 'L' : 'M'}${((i / (points - 1)) * width).toFixed(1)},${(height - ((p - min) / range) * height).toFixed(1)}`)
+    .map(
+      (p, i) =>
+        `${i ? 'L' : 'M'}${((i / (n - 1)) * width).toFixed(1)},${(height - ((p - min) / range) * height).toFixed(1)}`,
+    )
     .join(' ');
-  const last = pts[pts.length - 1]!;
+  const last = pts[n - 1]!;
   const lastY = (height - ((last - min) / range) * height).toFixed(1);
 
   if (variant === 'area') {

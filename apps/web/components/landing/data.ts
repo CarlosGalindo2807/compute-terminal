@@ -9,6 +9,9 @@ export interface TickerItem {
   v: string;
   d: number;
   seed: number;
+  /** Real 24h bucketed median series for the sparkline. Empty array means
+   *  fall back to seeded decorative output. */
+  series?: number[];
 }
 
 export interface CoverageStats {
@@ -48,7 +51,7 @@ function fmtUsd(n: number): string {
   return `$${n.toFixed(n < 1 ? 3 : 2)}`;
 }
 
-/** Latest two values per index, computes delta vs previous date. */
+/** Latest value per index + day-over-day delta + a 14-day sparkline series. */
 async function loadIndexTickerRows(): Promise<TickerItem[]> {
   try {
     const sb = getServiceClient();
@@ -62,16 +65,23 @@ async function loadIndexTickerRows(): Promise<TickerItem[]> {
         .select('date, close_price')
         .eq('index_id', idx.id)
         .order('date', { ascending: false })
-        .limit(2);
+        .limit(14);
       if (!data || data.length === 0) continue;
       const latest = Number(data[0]!.close_price);
       const prev = data[1] ? Number(data[1].close_price) : latest;
       const d = prev > 0 ? ((latest - prev) / prev) * 100 : 0;
+      // Reverse chronological → render chronological for the sparkline.
+      const series = data
+        .slice()
+        .reverse()
+        .map((r) => Number(r.close_price))
+        .filter((n) => Number.isFinite(n));
       items.push({
-        k: idx.slug.toUpperCase().replace('CTI-', 'CTI-'),
+        k: idx.slug.toUpperCase(),
         v: fmtUsd(latest),
         d: Number(d.toFixed(2)),
         seed: idx.slug.length * 13 + 7,
+        series: series.length >= 2 ? series : undefined,
       });
     }
     return items;
@@ -80,12 +90,21 @@ async function loadIndexTickerRows(): Promise<TickerItem[]> {
   }
 }
 
-/** Top GPUs by recent snapshot volume — show 24h median spot + last-hour delta. */
+/** Top GPUs by recent activity, with proper 24h delta + bucketed series.
+ *
+ *  Delta computation: median of the first quartile of the 24h window vs
+ *  median of the last quartile. The previous version used an
+ *  iteration-order "first price seen" which is essentially random noise
+ *  on stable markets; this version captures real movement.
+ *
+ *  Series: snapshots bucketed into 12 evenly-spaced 2-hour buckets, each
+ *  bucket's median price. Feeds a real Sparkline. Empty buckets carry
+ *  the previous non-empty bucket's value forward (last-observation-carried-
+ *  forward), so visual gaps don't appear during scraper silence. */
 async function loadGpuTickerRows(): Promise<TickerItem[]> {
   try {
     const sb = getServiceClient();
     const since24Ms = Date.now() - 24 * 3600_000;
-    const since1Ms = Date.now() - 3600_000;
     const since24 = new Date(since24Ms).toISOString();
 
     const [{ data: gpus }, { data: snaps }] = await Promise.all([
@@ -95,42 +114,74 @@ async function loadGpuTickerRows(): Promise<TickerItem[]> {
         .select('gpu_model_id, price_per_hour, captured_at')
         .eq('is_outlier', false)
         .eq('is_normalized', true)
+        .eq('currency', 'USD')
         .gte('captured_at', since24)
+        .order('captured_at', { ascending: true })
         .limit(20_000),
     ]);
     if (!gpus || !snaps) return [];
 
-    const byGpu = new Map<string, { sum24: number; n24: number; sum1: number; n1: number; firstP: number | null }>();
+    const N_BUCKETS = 12;
+    const bucketMs = (24 * 3600_000) / N_BUCKETS;
+
+    type Acc = { prices: number[]; buckets: number[][] };
+    const byGpu = new Map<string, Acc>();
     for (const s of snaps) {
-      const t = new Date(s.captured_at as string).getTime();
       const id = s.gpu_model_id as string;
+      const t = new Date(s.captured_at as string).getTime();
       const p = Number(s.price_per_hour);
-      const cur = byGpu.get(id) ?? { sum24: 0, n24: 0, sum1: 0, n1: 0, firstP: null };
-      cur.sum24 += p;
-      cur.n24 += 1;
-      if (t >= since1Ms) {
-        cur.sum1 += p;
-        cur.n1 += 1;
-      }
-      if (cur.firstP === null) cur.firstP = p;
+      const cur = byGpu.get(id) ?? {
+        prices: [],
+        buckets: Array.from({ length: N_BUCKETS }, () => [] as number[]),
+      };
+      cur.prices.push(p);
+      const idx = Math.min(N_BUCKETS - 1, Math.max(0, Math.floor((t - since24Ms) / bucketMs)));
+      cur.buckets[idx]!.push(p);
       byGpu.set(id, cur);
     }
+
+    const median = (xs: number[]): number => {
+      const s = [...xs].sort((a, b) => a - b);
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 === 0 ? (s[m - 1]! + s[m]!) / 2 : s[m]!;
+    };
 
     const rows: TickerItem[] = [];
     for (const g of gpus) {
       const stats = byGpu.get(g.id as string);
-      if (!stats || stats.n24 < 5) continue;
-      const median24 = stats.sum24 / stats.n24;
-      const median1 = stats.n1 > 0 ? stats.sum1 / stats.n1 : median24;
-      const d = stats.firstP && stats.firstP > 0 ? ((median1 - stats.firstP) / stats.firstP) * 100 : 0;
+      if (!stats || stats.prices.length < 8) continue;
+
+      const med24 = median(stats.prices);
+
+      // First quartile (first 3 buckets = ~6h) vs last quartile.
+      const firstQ = stats.buckets.slice(0, 3).flat();
+      const lastQ = stats.buckets.slice(N_BUCKETS - 3).flat();
+      let d = 0;
+      if (firstQ.length > 0 && lastQ.length > 0) {
+        const mF = median(firstQ);
+        const mL = median(lastQ);
+        d = mF > 0 ? ((mL - mF) / mF) * 100 : 0;
+      }
+
+      // Bucket-medians series with LOCF for empty buckets.
+      const series: number[] = [];
+      let lastSeen = med24;
+      for (const b of stats.buckets) {
+        if (b.length > 0) lastSeen = median(b);
+        series.push(lastSeen);
+      }
+
       const label = `${g.model}${g.variant ? '·' + g.variant : ''}`.toUpperCase().slice(0, 18);
       rows.push({
         k: label,
-        v: fmtUsd(median24),
+        v: fmtUsd(med24),
         d: Number(d.toFixed(2)),
         seed: (g.slug as string).length * 7 + 3,
+        series,
       });
     }
+    // Most-active first (proxy: most snapshots in window).
+    rows.sort((a, b) => (b.series?.length ?? 0) - (a.series?.length ?? 0));
     return rows.slice(0, 10);
   } catch {
     return [];

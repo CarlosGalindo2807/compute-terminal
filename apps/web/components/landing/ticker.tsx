@@ -24,13 +24,13 @@ const FALLBACK: TickerItem[] = [
   { k: 'A6000', v: '$0.51', d: -0.1, seed: 12 },
 ];
 
-function Item({ k, v, d, seed }: TickerItem) {
+function Item({ k, v, d, seed, series }: TickerItem) {
   return (
     <div className="tk-item">
       <span className="tk-label">{k}</span>
       <span className="tk-val">{v}</span>
       <span className="spark">
-        <Sparkline seed={seed} ariaLabel={`${k} 24h`} />
+        <Sparkline seed={seed} values={series} ariaLabel={`${k} 24h`} />
       </span>
       <span className={`tk-d ${d >= 0 ? 'up' : 'down'}`}>
         {d >= 0 ? '▲' : '▼'} {Math.abs(d).toFixed(2)}%

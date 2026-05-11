@@ -204,3 +204,29 @@ Sequenced into three product lines (L1 Terminal → L2 Hedging-as-a-Service → 
 **Why:** v0 has one admin (Carlos). A roles table is over-engineering for a 1-person team.
 
 **Reconsider if:** team grows to 3+, or we bring on a contractor who needs partial admin access. Then move to a `user_profiles.role` enum.
+
+## Open question — index_calculator daily delta volatility (2026-05-11)
+
+**What:** Three observations on `index_values_daily.close_price` between 2026-05-09 → 2026-05-11:
+
+| index | 2026-05-09 | 2026-05-10 | 2026-05-11 | day-over-day |
+|---|---|---|---|---|
+| cti-h100 | $2.690 | $2.690 | $1.534 | −43% |
+| cti-blackwell | $1.189 | $5.980 | $1.064 | −82% |
+| cti-composite | $2.690 | $5.980 | $0.877 | −85% |
+
+**What we know:**
+- `methodology_used` on these rows alternates between `simple_vwap` and `filtered_vwap` (the published v1.0 lock should pin it to `filtered_vwap`, so the variation itself is a smell).
+- `num_observations` jumped from 17–123 to 363–1000 between 2026-05-10 → 2026-05-11; new GPU SKUs and/or providers are entering the universe each day and the per-day sample is unstable.
+- The 24h-median for H100-SXM-80 specifically (queried directly) is $2.69 today, while `cti-h100.close_price` is $1.53. The index is including a wider set than just H100-SXM-80.
+
+**Why this matters:**
+- The landing ticker now shows these deltas honestly (commit `<this one>`). On the surface they look like a market crash; they're an artefact of universe expansion, not a real move.
+- The locked methodology promise on `/methodology` says outputs must be reproducible from `methodology_version`. Right now the version says `v1.0` but the inputs are evidently changing day to day.
+
+**Reconsider when:** before the next Index Architect run that touches methodology, dig into `apps/workers/src/functions/index-calculator.ts` and confirm:
+1. The eligibility filter (`is_outlier=false ∧ is_normalized=true ∧ reliability ≥ floor`) is being applied consistently per the published spec.
+2. The per-index `universe` (which `gpu_model_id`s contribute) is fixed or whether it expands with new SKUs.
+3. `methodology_used` should not vary day to day with a locked v1.0 — either the calculator is silently A/B'ing or there's a write path we missed.
+
+**Decision deferred:** intentionally not fixing this in the ticker pass. The ticker reflects DB state truthfully. The calculator audit is a separate workstream and may need the Index Committee.
