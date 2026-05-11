@@ -1,5 +1,7 @@
 import './globals.css';
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { PostHogProvider } from '@/components/posthog-provider';
 
 export const metadata: Metadata = {
   title: 'Compute Index Terminal — the reference price for compute',
@@ -34,7 +36,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
       </head>
-      <body className="bg-bg-base text-ink-primary antialiased">{children}</body>
+      <body className="bg-bg-base text-ink-primary antialiased">
+        <Suspense fallback={null}>
+          <PostHogProvider>{children}</PostHogProvider>
+        </Suspense>
+      </body>
     </html>
   );
 }
