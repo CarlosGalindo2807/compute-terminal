@@ -160,16 +160,35 @@ export const indexCalculator = inngest.createFunction(
         }
 
         // Published value — always the locked methodology, version-stamped.
-        const prices = inputs.map((i) => i.pricePerHour).sort((a, b) => a - b);
+        // OHLC: open/close are first/last by *timestamp* (not by price). The
+        // pre-013 calculator sorted by price and wrote min/max into open/close,
+        // which made a single outlier rotate close_price by tens of percent
+        // and produced fake catastrophic day-over-day deltas. high/low keep
+        // min/max semantics — that's the standard OHLC contract.
+        const byTime = [...eligible].sort(
+          (a, b) => new Date(a.captured_at).getTime() - new Date(b.captured_at).getTime(),
+        );
+        const prices = inputs.map((i) => i.pricePerHour);
+        const sortedPrices = [...prices].sort((a, b) => a - b);
+        const openPrice = Number(byTime[0]!.price_per_hour);
+        const closePrice = Number(byTime[byTime.length - 1]!.price_per_hour);
+        const lowPrice = sortedPrices[0]!;
+        const highPrice = sortedPrices[sortedPrices.length - 1]!;
+        // Contributing GPU universe — the subset of declared gpu_models whose
+        // snapshots actually cleared the reliability + outlier filter. Lets
+        // future readers see whether an index move reflects price movement
+        // or universe composition shifts (e.g. cti-h100's 21 → 363
+        // observations between 2026-05-09 and 2026-05-11).
+        const contributingGpuIds = Array.from(new Set(eligible.map((s) => s.gpu_model_id)));
         await sb.from('index_values_daily').upsert({
           index_id: idx.id,
           date: dateStr,
-          open_price: prices[0],
-          high_price: prices[prices.length - 1],
-          low_price: prices[0],
-          close_price: prices[prices.length - 1],
+          open_price: openPrice,
+          high_price: highPrice,
+          low_price: lowPrice,
+          close_price: closePrice,
           vwap: published.value,
-          median_price: prices[Math.floor(prices.length / 2)],
+          median_price: sortedPrices[Math.floor(sortedPrices.length / 2)],
           trimmed_mean: methodologies.trimmed_mean_10(inputs).value,
           num_observations: inputs.length,
           num_providers: numProviders,
@@ -177,6 +196,7 @@ export const indexCalculator = inngest.createFunction(
           methodology_version: PUBLISHED_METHODOLOGY_VERSION,
           methodology_locked: true,
           confidence_score: research[0]?.composite ?? null,
+          contributing_gpu_ids: contributingGpuIds,
         });
 
         await publishEvent({
