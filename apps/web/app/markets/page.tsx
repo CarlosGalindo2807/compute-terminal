@@ -1,6 +1,11 @@
 import { Nav } from '@/components/nav';
 import { Sparkline } from '@/components/sparkline';
 import { formatPrice, formatPctChange } from '@compute-terminal/shared/formatters';
+import {
+  PUBLISHED_METHODOLOGY,
+  methodologies,
+  type MethodologyInput,
+} from '@compute-terminal/shared/methodology';
 import { getServiceClient } from '@/lib/supabase-server';
 
 export const revalidate = 30;
@@ -17,56 +22,80 @@ interface Row {
 }
 
 interface Snap {
-  gpu_model_id: string;
   price_per_hour: number;
+  num_gpus: number;
   captured_at: string;
   provider_id: string;
 }
 
+// /markets shows methodology-consistent prices end-to-end:
+//   current   = filtered_vwap v1.0 over trailing 24h of eligible snapshots
+//   prevClose = latest gpu_prices_daily.vwap row for the same GPU
+//   change_pct = (current − prevClose) / prevClose
+// Same formula at both endpoints means provider-mix bias cancels by
+// construction. Previous shape — current = mean of last 1h, change vs the
+// oldest snapshot in 24h — surfaced cross-provider spread as fake movement
+// (B200·SXM showed −34.12% on /markets while the landing ticker said
+// −24.98% for the same GPU on the same day; the +73% / +84% / +155%
+// numbers observed in the audit were entirely a sample-composition artifact).
+// Bloomberg / Refinitiv use the same shape: Last + Prev Close + % Change.
+//
+// Per-GPU ASC+DESC fetches handle the PostgREST 1000-row cap. Reliability +
+// MIN_OBS gates match the nightly gpu-price-calculator so the numbers shown
+// here would reproduce the gpu_prices_daily row exactly if the cron were to
+// run "now".
 async function loadMarkets(): Promise<Row[]> {
   const sb = getServiceClient();
   const since24Ms = Date.now() - 24 * 3600_000;
-  const since1Ms = Date.now() - 1 * 3600_000;
   const since24 = new Date(since24Ms).toISOString();
 
-  // Per-GPU parallel ASC+DESC fetches. PostgREST caps responses at 1000 rows
-  // even when .limit(50_000) is requested (verified 2026-05-12), so a single
-  // sweep returned only the oldest ~1h of snapshots → bogus first/last deltas
-  // and sparklines that flat-lined past bucket 1. ASC limit 1000 + DESC limit
-  // 1000 deduped by id covers both ends of the 24h window for high-volume
-  // GPUs. Hits the (gpu_model_id, captured_at desc) WHERE is_outlier=false
-  // partial index.
-  const { data: gpus } = await sb
-    .from('gpu_models')
-    .select('id, slug, model, variant, vram_gb')
-    .eq('is_active', true)
-    .order('reference_price_per_hour', { ascending: false });
+  const [{ data: gpus }, { data: providersRows }] = await Promise.all([
+    sb
+      .from('gpu_models')
+      .select('id, slug, model, variant, vram_gb')
+      .eq('is_active', true)
+      .order('reference_price_per_hour', { ascending: false }),
+    sb.from('providers').select('id, reliability_score'),
+  ]);
+  const reliabilityById = new Map<string, number>(
+    (providersRows ?? []).map((p) => [p.id as string, Number(p.reliability_score)]),
+  );
 
   const buckets = 24;
   const bucketMs = (24 * 3600_000) / buckets;
 
   const results = await Promise.all(
     (gpus ?? []).map(async (g) => {
-      const [ascR, descR] = await Promise.all([
+      const [ascR, descR, dailyR] = await Promise.all([
         sb
           .from('price_snapshots')
-          .select('id, price_per_hour, captured_at, provider_id')
+          .select('id, price_per_hour, num_gpus, captured_at, provider_id')
           .eq('gpu_model_id', g.id)
           .eq('is_outlier', false)
           .eq('is_normalized', true)
+          .eq('currency', 'USD')
           .gte('captured_at', since24)
           .order('captured_at', { ascending: true })
           .limit(1000),
         sb
           .from('price_snapshots')
-          .select('id, price_per_hour, captured_at, provider_id')
+          .select('id, price_per_hour, num_gpus, captured_at, provider_id')
           .eq('gpu_model_id', g.id)
           .eq('is_outlier', false)
           .eq('is_normalized', true)
+          .eq('currency', 'USD')
           .gte('captured_at', since24)
           .order('captured_at', { ascending: false })
           .limit(1000),
+        sb
+          .from('gpu_prices_daily')
+          .select('vwap')
+          .eq('gpu_model_id', g.id)
+          .order('date', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
+
       const seen = new Set<string>();
       const snaps: Snap[] = [];
       for (const r of [...(ascR.data ?? []), ...(descR.data ?? [])]) {
@@ -74,8 +103,8 @@ async function loadMarkets(): Promise<Row[]> {
         if (seen.has(id)) continue;
         seen.add(id);
         snaps.push({
-          gpu_model_id: g.id,
           price_per_hour: Number(r.price_per_hour),
+          num_gpus: Number(r.num_gpus),
           captured_at: r.captured_at as string,
           provider_id: r.provider_id as string,
         });
@@ -83,46 +112,68 @@ async function loadMarkets(): Promise<Row[]> {
       snaps.sort((a, b) => a.captured_at.localeCompare(b.captured_at));
       const name = `${g.model}${g.variant ? ' ' + g.variant : ''}`;
 
-      if (snaps.length === 0) {
-        return { gpu_id: g.id, slug: g.slug, name, vram: g.vram_gb, current: NaN, change_pct: NaN, num_providers: 0, spark: [] } satisfies Row;
+      const eligible = snaps.filter(
+        (s) => (reliabilityById.get(s.provider_id) ?? 0) >= PUBLISHED_METHODOLOGY.reliabilityFloor,
+      );
+      const providers = new Set(eligible.map((s) => s.provider_id));
+
+      if (eligible.length < PUBLISHED_METHODOLOGY.minObservations) {
+        return {
+          gpu_id: g.id,
+          slug: g.slug,
+          name,
+          vram: g.vram_gb,
+          current: NaN,
+          change_pct: NaN,
+          num_providers: providers.size,
+          spark: [],
+        } satisfies Row;
       }
 
+      const inputs: MethodologyInput[] = eligible.map((s) => ({
+        pricePerHour: s.price_per_hour,
+        numGpus: s.num_gpus,
+        capturedAt: new Date(s.captured_at),
+        providerReliability: reliabilityById.get(s.provider_id) ?? 1,
+      }));
+      const live = methodologies[PUBLISHED_METHODOLOGY.formulaId](inputs);
+      const current = Number.isFinite(live.value) ? live.value : NaN;
+
+      const prevClose = dailyR.data?.vwap != null ? Number(dailyR.data.vwap) : NaN;
+      const change_pct =
+        Number.isFinite(current) && Number.isFinite(prevClose) && prevClose > 0
+          ? (current - prevClose) / prevClose
+          : NaN;
+
+      // Sparkline: intra-day texture from the same eligible set. 24 buckets
+      // of bucket-mean (not methodology-filtered) — purely visual.
       const sparkSum = new Array<number>(buckets).fill(0);
       const sparkCount = new Array<number>(buckets).fill(0);
-      let recentSum = 0;
-      let recentCount = 0;
-      const providers = new Set<string>();
-
-      for (const s of snaps) {
+      for (const s of eligible) {
         const t = new Date(s.captured_at).getTime();
         const idx = Math.min(buckets - 1, Math.max(0, Math.floor((t - since24Ms) / bucketMs)));
-        const p = Number(s.price_per_hour);
-        sparkSum[idx]! += p;
+        sparkSum[idx]! += s.price_per_hour;
         sparkCount[idx]! += 1;
-        if (t >= since1Ms) {
-          recentSum += p;
-          recentCount += 1;
-        }
-        providers.add(s.provider_id);
       }
-
-      const earliest = Number(snaps[0]!.price_per_hour);
-      const lastPrice = Number(snaps[snaps.length - 1]!.price_per_hour);
-      const current = recentCount > 0 ? recentSum / recentCount : lastPrice;
-      const change_pct = earliest > 0 ? (current - earliest) / earliest : NaN;
-
       const spark: number[] = [];
-      let lastSeen = current;
+      let lastSeen = Number.isFinite(current) ? current : NaN;
       for (let i = 0; i < buckets; i++) {
         if (sparkCount[i]! > 0) {
           lastSeen = sparkSum[i]! / sparkCount[i]!;
-          spark.push(lastSeen);
-        } else {
-          spark.push(lastSeen);
         }
+        spark.push(lastSeen);
       }
 
-      return { gpu_id: g.id, slug: g.slug, name, vram: g.vram_gb, current, change_pct, num_providers: providers.size, spark } satisfies Row;
+      return {
+        gpu_id: g.id,
+        slug: g.slug,
+        name,
+        vram: g.vram_gb,
+        current,
+        change_pct,
+        num_providers: providers.size,
+        spark: spark.every(Number.isFinite) ? spark : [],
+      } satisfies Row;
     }),
   );
 
