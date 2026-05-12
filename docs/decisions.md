@@ -233,6 +233,22 @@ Sequenced into three product lines (L1 Terminal → L2 Hedging-as-a-Service → 
 
 **Methodology lock still holds:** `methodology_used` on every recent row is `filtered_vwap` v1.0 per the locked spec; the 2026-05-09 row showing `simple_vwap` is pre-lock historical residue.
 
+## gpu_prices_daily — per-GPU benchmark level (added 2026-05-12)
+
+**What:** Migration 014 introduces `gpu_prices_daily`, a per-GPU equivalent of `index_values_daily`. A new Inngest function `gpu-price-calculator` runs at 00:35 UTC nightly (5 min after the index calculator), applies the **same locked methodology** (filtered_vwap v1.0 — MAD-3σ outlier filter, num_gpus-weighted mean, reliability ≥ 0.5) per GPU, and writes one row per (gpu, date). Same audit columns as `index_values_daily`: `methodology_used`, `methodology_version`, `methodology_locked`, `contributing_provider_ids`. RLS-on with public-read policy (defense-in-depth per migration 010).
+
+**Why:** the landing GPU ticker was computing 24h delta as the median of the first quartile of raw `price_snapshots` vs the median of the last quartile. For high-spread consumer GPUs (RTX 4080 Super $0.068 → $0.280 across providers in the same 24h, RTX 3090 $0.056 → $0.220) this surfaced provider-mix bias as fake price movement — `+176 %` and `+191 %` were observed live on the production ticker on 2026-05-12. The underlying market hadn't moved; we were just sampling cheap providers earlier in the time window and expensive providers later.
+
+Every benchmark we'd want to benchmark against — MSCI, S&P, FTSE Russell, Bloomberg Commodity, ICE LIBOR-replacement, the WM/Reuters FX fix — applies its methodology at **both endpoints** of a comparison and publishes the difference. IOSCO Principles for Financial Benchmarks (Principle 7: Data Sufficiency, Principle 8: Hierarchy of Data Inputs) require this. The ticker now does the same: it reads `gpu_prices_daily.vwap` for T (latest) and T−1 (prior) and reports `(T − T−1) / T−1`. Provider-mix bias cancels by construction.
+
+**Backfill:** `scripts/backfill-gpu-prices.mjs` retroactively computes 30 days of `gpu_prices_daily` rows under filtered_vwap v1.0 — exactly the convention major indices use when publishing a back-test of a new methodology. Every row is stamped with `methodology_version='v1.0'` so future readers see the audit trail. Only 4 days of source data exist (scraper bring-up was 2026-05-08) so only 50 backfilled rows; sparklines will grow as the nightly cron accumulates history.
+
+**Date convention:** rows are labeled by **publication date**, content covers the 24 h preceding that date — i.e. a row dated 2026-05-12 was published at 00:35 UTC on 2026-05-12 and reflects snapshots from [2026-05-11 00:00, 2026-05-12 00:00]. This matches the existing convention in `index_values_daily` (set by `index-calculator.ts:31-34`). It differs from S&P/Bloomberg's "row date = content date" convention; documented here so it's not silently rediscovered. Future migration could renormalize both tables, but it'd require a coordinated relabel — out of scope today.
+
+**Verified live (2026-05-12):** ticker now shows methodology-consistent deltas — V100·SXM2 +0.06 % (stable institutional price, correct), RTX 5090 +5.85 %, RTX 4090 +12.69 %, B200·SXM −24.98 %, H200·SXM −41.16 %. No more 100+ % phantom moves from provider-mix bias.
+
+**Reconsider when:** we want intra-day (sub-daily) ticker deltas. That'd require either an on-the-fly methodology computation for "current" (trailing 24h ending now) compared against the most recent gpu_prices_daily row, or a more granular fixings table (hourly, like CME's settlement intra-day prices). Not needed for v1.
+
 ## PostgREST 1000-row cap + per-GPU ASC+DESC merge (added 2026-05-12)
 
 **What:** Supabase's PostgREST gateway hard-caps every REST response at 1000 rows regardless of `.limit(N)` or `Range` header (verified by direct probe: `limit=1000/1500/2000/5000` all return exactly 1000). This is the `db-max-rows` setting in PostgREST; it cannot be overridden per-request, only via Supabase project config.

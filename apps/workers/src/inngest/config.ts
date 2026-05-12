@@ -3,6 +3,7 @@
 
 import { contentGenerator } from '../functions/content-generator';
 import { contentPublisher } from '../functions/content-publisher';
+import { gpuPriceCalculator } from '../functions/gpu-price-calculator';
 import { indexCalculator } from '../functions/index-calculator';
 import { normalizeUnmatched } from '../functions/normalize-unmatched';
 import { outlierDetector } from '../functions/outlier-detector';
@@ -35,6 +36,7 @@ export const functions = [
   outlierDetector,
   normalizeUnmatched,
   indexCalculator,
+  gpuPriceCalculator,
   providerDiscovery,
   contentGenerator,
   contentPublisher,

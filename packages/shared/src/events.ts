@@ -11,6 +11,7 @@ export const EventTypes = {
   providerQualityRecovered: 'provider_quality_recovered',
   methodologyChanged: 'methodology_changed',
   indexValueComputed: 'index_value_computed',
+  gpuPriceComputed: 'gpu_price_computed',
   providerCandidateDiscovered: 'provider_candidate_discovered',
   contentDrafted: 'content_drafted',
   contentPublished: 'content_published',

@@ -97,37 +97,31 @@ async function loadIndexTickerRows(): Promise<TickerItem[]> {
   }
 }
 
-/** Top GPUs by recent activity, with proper 24h delta + bucketed series.
+/** Top GPUs by recent activity, with methodology-consistent 24h delta +
+ *  benchmark-level sparkline.
  *
- *  Delta computation: median of the first quartile of the 24h window vs
- *  median of the last quartile. The previous version used an
- *  iteration-order "first price seen" which is essentially random noise
- *  on stable markets; this version captures real movement.
+ *  Reads `gpu_prices_daily.vwap` — the daily fixing of filtered_vwap
+ *  v1.0 (locked methodology) per GPU. Delta is `(latest − previous) /
+ *  previous`, both endpoints computed under the same methodology by the
+ *  nightly cron at 00:35 UTC. This is the IOSCO Principle 8 /
+ *  MSCI / S&P / FTSE Russell convention: same formula at both endpoints
+ *  means provider-mix bias cancels by construction. The prior version
+ *  computed first-quartile vs last-quartile of raw price_snapshots,
+ *  which surfaced cross-provider price spread as fake "movement" — e.g.
+ *  RTX 4080 Super ranging $0.068 → $0.280 across providers in the same
+ *  24h showed +176 % on the ticker when nothing actually moved.
  *
- *  Series: snapshots bucketed into 12 evenly-spaced 2-hour buckets, each
- *  bucket's median price. Feeds a real Sparkline. Empty buckets carry
- *  the previous non-empty bucket's value forward (last-observation-carried-
- *  forward), so visual gaps don't appear during scraper silence.
+ *  Sparkline: last 14 daily vwap values from gpu_prices_daily. If a row
+ *  is missing for a given day, that day's gap is left out — no
+ *  last-observation-carried-forward (no inventing data; the audit trail
+ *  shows real gaps).
  *
- *  Why per-GPU ASC + DESC merged fetches rather than a single sweep:
- *  PostgREST caps responses at max-rows=1000 even when `.limit(N)`
- *  requests more (verified live 2026-05-12). With ~21k filtered
- *  snapshots/24h across ~28 active GPUs, a single-table sweep returns
- *  only the oldest ~1.1h of data; the bucketed ticker then has an empty
- *  last quartile → delta=0 fallback → flat sparkline. Per-GPU windows
- *  average ~750 rows but the busiest GPUs (H100·SXM, V100·SXM2, RTX
- *  5090) exceed 1000/24h. So we issue two queries per GPU — oldest 1000
- *  (ASC) and newest 1000 (DESC) — and dedupe by row id. That covers both
- *  the firstQ (0-6h) and lastQ (18-24h) of the window for high-volume
- *  GPUs; the middle is allowed to be sparse since LOCF fills the
- *  sparkline gaps visually. 28 × 2 = 56 parallel queries hit the
- *  (gpu_model_id, captured_at desc) WHERE is_outlier=false partial
- *  index; the page is ISR-cached for 30s. */
+ *  Skip rule: a GPU needs ≥ 2 rows in gpu_prices_daily (one for latest,
+ *  one for prior). Otherwise no delta is meaningful and we drop it from
+ *  the ticker. */
 async function loadGpuTickerRows(): Promise<TickerItem[]> {
   try {
     const sb = getServiceClient();
-    const since24Ms = Date.now() - 24 * 3600_000;
-    const since24 = new Date(since24Ms).toISOString();
 
     const { data: gpus } = await sb
       .from('gpu_models')
@@ -135,92 +129,36 @@ async function loadGpuTickerRows(): Promise<TickerItem[]> {
       .eq('is_active', true);
     if (!gpus) return [];
 
-    const N_BUCKETS = 12;
-    const bucketMs = (24 * 3600_000) / N_BUCKETS;
-
-    const median = (xs: number[]): number => {
-      const s = [...xs].sort((a, b) => a - b);
-      const m = Math.floor(s.length / 2);
-      return s.length % 2 === 0 ? (s[m - 1]! + s[m]!) / 2 : s[m]!;
-    };
-
     const perGpu = await Promise.all(
       gpus.map(async (g) => {
-        const [ascR, descR] = await Promise.all([
-          sb
-            .from('price_snapshots')
-            .select('id, price_per_hour, captured_at')
-            .eq('gpu_model_id', g.id as string)
-            .eq('is_outlier', false)
-            .eq('is_normalized', true)
-            .eq('currency', 'USD')
-            .gte('captured_at', since24)
-            .order('captured_at', { ascending: true })
-            .limit(1000),
-          sb
-            .from('price_snapshots')
-            .select('id, price_per_hour, captured_at')
-            .eq('gpu_model_id', g.id as string)
-            .eq('is_outlier', false)
-            .eq('is_normalized', true)
-            .eq('currency', 'USD')
-            .gte('captured_at', since24)
-            .order('captured_at', { ascending: false })
-            .limit(1000),
-        ]);
-        const seen = new Set<string>();
-        const snaps: Array<{ price_per_hour: number; captured_at: string }> = [];
-        for (const r of [...(ascR.data ?? []), ...(descR.data ?? [])]) {
-          const id = r.id as string;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          snaps.push({ price_per_hour: Number(r.price_per_hour), captured_at: r.captured_at as string });
-        }
-        return { g, snaps };
+        const { data } = await sb
+          .from('gpu_prices_daily')
+          .select('date, vwap, num_observations')
+          .eq('gpu_model_id', g.id as string)
+          .order('date', { ascending: false })
+          .limit(14);
+        return { g, rows: (data as Array<{ date: string; vwap: number; num_observations: number }> | null) ?? [] };
       }),
     );
 
     const ranked: Array<{ n: number; item: TickerItem }> = [];
-    for (const { g, snaps } of perGpu) {
-      if (snaps.length < 8) continue;
-
-      const prices: number[] = [];
-      const buckets: number[][] = Array.from({ length: N_BUCKETS }, () => []);
-      for (const s of snaps) {
-        const t = new Date(s.captured_at as string).getTime();
-        const p = Number(s.price_per_hour);
-        prices.push(p);
-        const idx = Math.min(N_BUCKETS - 1, Math.max(0, Math.floor((t - since24Ms) / bucketMs)));
-        buckets[idx]!.push(p);
-      }
-
-      const med24 = median(prices);
-
-      const firstQ = buckets.slice(0, 3).flat();
-      const lastQ = buckets.slice(N_BUCKETS - 3).flat();
-      let d = 0;
-      if (firstQ.length > 0 && lastQ.length > 0) {
-        const mF = median(firstQ);
-        const mL = median(lastQ);
-        d = mF > 0 ? ((mL - mF) / mF) * 100 : 0;
-      }
-
-      const series: number[] = [];
-      let lastSeen = med24;
-      for (const b of buckets) {
-        if (b.length > 0) lastSeen = median(b);
-        series.push(lastSeen);
-      }
+    for (const { g, rows } of perGpu) {
+      if (rows.length < 2) continue;
+      const latest = Number(rows[0]!.vwap);
+      const prev = Number(rows[1]!.vwap);
+      if (!Number.isFinite(latest) || !Number.isFinite(prev) || prev <= 0) continue;
+      const d = ((latest - prev) / prev) * 100;
+      const series = rows.slice().reverse().map((r) => Number(r.vwap)).filter(Number.isFinite);
 
       const label = `${g.model}${g.variant ? '·' + g.variant : ''}`.toUpperCase().slice(0, 18);
       ranked.push({
-        n: snaps.length,
+        n: Number(rows[0]!.num_observations) || 0,
         item: {
           k: label,
-          v: fmtUsd(med24),
+          v: fmtUsd(latest),
           d: Number(d.toFixed(2)),
           seed: (g.slug as string).length * 7 + 3,
-          series,
+          series: series.length >= 2 ? series : undefined,
         },
       });
     }
