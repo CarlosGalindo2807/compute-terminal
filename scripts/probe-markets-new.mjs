@@ -52,7 +52,7 @@ for (const g of gpus) {
     fetch(base + '&order=captured_at.asc', { headers: h }).then((r) => r.json()),
     fetch(base + '&order=captured_at.desc', { headers: h }).then((r) => r.json()),
     fetch(
-      url + '/rest/v1/gpu_prices_daily?select=vwap,date&gpu_model_id=eq.' + g.id + '&order=date.desc&limit=1',
+      url + '/rest/v1/gpu_prices_daily?select=vwap,date,num_observations,num_providers&gpu_model_id=eq.' + g.id + '&order=date.desc&limit=1',
       { headers: h },
     ).then((r) => r.json()),
   ]);
@@ -76,21 +76,25 @@ for (const g of gpus) {
     out.push({ name, current: null, prevClose: daily[0]?.vwap ?? null, delta: null, providers: providers.size, n: eligible.length });
     continue;
   }
+  const PREV_MIN_OBS = 20;
   const current = filteredVwap(eligible);
   const prevClose = daily[0]?.vwap != null ? Number(daily[0].vwap) : null;
-  const delta = prevClose && prevClose > 0 ? ((current - prevClose) / prevClose) * 100 : null;
-  out.push({ name, current, prevClose, delta, providers: providers.size, n: eligible.length });
+  const prevN = Number(daily[0]?.num_observations ?? 0);
+  const deltaReady = prevClose && prevClose > 0 && eligible.length >= PREV_MIN_OBS && prevN >= PREV_MIN_OBS;
+  const delta = deltaReady ? ((current - prevClose) / prevClose) * 100 : null;
+  out.push({ name, current, prevClose, delta, prevN, providers: providers.size, n: eligible.length, gated: !deltaReady && prevClose != null });
 }
 
 console.log('Predicted /markets table after fix:\n');
-console.log('GPU                              | current$/hr | prevClose$/hr | Δ%       | prov | n');
-console.log('---------------------------------|-------------|---------------|----------|------|-----');
+console.log('GPU                              | current$/hr | prevClose$/hr | Δ%       | prov | n today | n prev | note');
+console.log('---------------------------------|-------------|---------------|----------|------|---------|--------|-----');
 for (const r of out) {
-  const cur = r.current != null ? `$${r.current.toFixed(3)}` : '—';
+  const cur = r.current != null && Number.isFinite(r.current) ? `$${r.current.toFixed(3)}` : '—';
   const prev = r.prevClose != null ? `$${r.prevClose.toFixed(3)}` : '—';
   const d = r.delta != null ? `${r.delta >= 0 ? '+' : ''}${r.delta.toFixed(2)}%` : '—';
+  const note = r.gated ? 'gated (Δ < 20 obs)' : '';
   console.log(
-    `${r.name.padEnd(32)} | ${cur.padStart(10)}  | ${prev.padStart(12)}  | ${d.padStart(8)} | ${String(r.providers).padStart(4)} | ${String(r.n).padStart(4)}`,
+    `${r.name.padEnd(32)} | ${cur.padStart(10)}  | ${prev.padStart(12)}  | ${d.padStart(8)} | ${String(r.providers).padStart(4)} | ${String(r.n).padStart(6)}  | ${String(r.prevN).padStart(6)} | ${note}`,
   );
 }
 

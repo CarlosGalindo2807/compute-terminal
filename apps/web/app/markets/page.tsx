@@ -89,7 +89,7 @@ async function loadMarkets(): Promise<Row[]> {
           .limit(1000),
         sb
           .from('gpu_prices_daily')
-          .select('vwap')
+          .select('vwap, num_observations, num_providers')
           .eq('gpu_model_id', g.id)
           .order('date', { ascending: false })
           .limit(1)
@@ -140,10 +140,26 @@ async function loadMarkets(): Promise<Row[]> {
       const current = Number.isFinite(live.value) ? live.value : NaN;
 
       const prevClose = dailyR.data?.vwap != null ? Number(dailyR.data.vwap) : NaN;
-      const change_pct =
-        Number.isFinite(current) && Number.isFinite(prevClose) && prevClose > 0
-          ? (current - prevClose) / prevClose
-          : NaN;
+      // Data-quality gate on the delta column. A row in gpu_prices_daily
+      // only needs minObservations (5) to be PUBLISHED, but the % change a
+      // visitor sees is a comparison and should clear a higher bar — IOSCO
+      // P7 (Data Sufficiency) explicitly distinguishes "valid input" from
+      // "robust enough to anchor a published comparison". 4× the minObs
+      // floor (≥20 obs each endpoint) suppresses thin-sample artifacts
+      // (e.g. B200·SXM showed +529% from one thin prevClose) while keeping
+      // every well-covered GPU. Current price still renders — only the
+      // delta column hides. Once a second active provider clears the
+      // reliability floor (in addition to Vast) we can also gate on
+      // num_providers ≥ 2 and remove the single-source caveat.
+      const PREV_MIN_OBS = 20;
+      const prevN = Number(dailyR.data?.num_observations ?? 0);
+      const deltaReady =
+        Number.isFinite(current) &&
+        Number.isFinite(prevClose) &&
+        prevClose > 0 &&
+        eligible.length >= PREV_MIN_OBS &&
+        prevN >= PREV_MIN_OBS;
+      const change_pct = deltaReady ? (current - prevClose) / prevClose : NaN;
 
       // Sparkline: intra-day texture from the same eligible set. 24 buckets
       // of bucket-mean (not methodology-filtered) — purely visual.
@@ -216,7 +232,16 @@ export default async function MarketsPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-ink-secondary mono">{r.vram} GB</td>
                     <td className="px-4 py-3 text-right mono">{formatPrice(r.current)}</td>
-                    <td className={`px-4 py-3 text-right mono ${Number.isFinite(r.change_pct) ? (positive ? 'text-signal-pos' : 'text-signal-neg') : 'text-ink-muted'}`}>
+                    <td
+                      className={`px-4 py-3 text-right mono ${Number.isFinite(r.change_pct) ? (positive ? 'text-signal-pos' : 'text-signal-neg') : 'text-ink-muted'}`}
+                      title={
+                        Number.isFinite(r.change_pct)
+                          ? undefined
+                          : Number.isFinite(r.current)
+                            ? 'Δ suppressed — prior-day fixing has <20 observations (data-sufficiency floor)'
+                            : 'no recent eligible observations'
+                      }
+                    >
                       {Number.isFinite(r.change_pct) ? formatPctChange(r.change_pct) : '—'}
                     </td>
                     <td className="px-4 py-3 text-center">
