@@ -1,7 +1,7 @@
 # Gap matrix — IOSCO Principles for Financial Benchmarks vs CTI v1.0
 
 **Living document.** Updated in place as our state changes. Latest revision:
-2026-05-10 (initial population by index-architect).
+2026-05-12 (P7 row + queue updated after the listings-vs-transactions note).
 
 **Companion note:** [`docs/research/notes/2026-05-10-iosco-principles-applied-to-cti.md`](../notes/2026-05-10-iosco-principles-applied-to-cti.md)
 — full prose, citations, and reasoning behind every row below.
@@ -35,8 +35,8 @@
 | # | Principle | CTI status | Evidence today | Specific gap | Priority | Owner / Action |
 |---|---|---|---|---|---|---|
 | P6 | Benchmark design | compliant | Filtered VWAP weighted by `num_gpus`, MAD-3σ outlier filter, eligibility floor (`reliability_score ≥ 0.5`), quorum (`min_observations ≥ 5`), all on `/methodology` and locked in `packages/shared/src/methodology.ts`. No expert judgment. | None substantive — design is defensible. | — | Maintain. Re-evaluate at each quarterly review (P10). |
-| P7 | Data sufficiency | partial / **structurally weak** | All inputs anchored in arms-length supply/demand interactions (provider listings + customer demand → published asks). 24h rolling window, ≥ 6 providers when fully ramped. | Inputs are **listings**, not observed trades. Strict P7 reading requires "anchored by observable transactions". On-demand cloud compute has no public consolidated tape. | P0 (but slow) | Dedicated research note `<date>-listings-vs-transactions.md`; consider self-classifying as a listed-price benchmark with stated limitations (LBMA-Gold-fixing pattern). |
-| P8 | Hierarchy of data inputs | partial | Hierarchy exists in code (rule → alias → fuzzy → Claude ≥ 0.95 auto → Claude 0.70–0.95 admin queue → outlier check → eligibility check → VWAP). Zero expert judgment in published-number path. | Hierarchy is implicit, not published. | P1 | Add "Hierarchy of data inputs" subsection to `/methodology` listing each ingestion stage and the deterministic rule. |
+| P7 | Data sufficiency | partial / **structurally weak** | All inputs anchored in a genuine arms-length cash market for GPU-hours; inputs are **firm executable list prices** (closer to BMR "committed quotes" than to indicative submissions). 24h rolling window, ≥ 6 providers when fully ramped. `invoice_observations` table exists (migration 011) as the latent transaction layer — empty today. | Inputs are executable **listings**, not observed trades. Strict P7 reading requires "anchored by observable transactions". On-demand compute has no public consolidated tape. Path now mapped (see note): **Track A** — self-classify as a *published-quote benchmark* + publish data-input hierarchy on `/methodology` (P0, needs a proposal — `/methodology` is hard-limit; folds in P8). **Track B** — stand up `invoice_observations` ingest, then publish a list-price-vs-observed-effective-price reconciliation report (P1, infra, no hard-limit file). **Track C** — provider-count-scaled quorum so thin-GPU indices suppress earlier (P1, methodology-class → proposal + committee). | P0 (Track A) / P1 (B, C) | Note done: [`notes/2026-05-12-listings-vs-transactions-iosco-p7.md`](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md). Next: proposal for the `/methodology` self-classification + hierarchy (P7 + P8 in one edit). |
+| P8 | Hierarchy of data inputs | partial | Hierarchy exists in code (rule → alias → fuzzy → Claude ≥ 0.95 auto → Claude 0.70–0.95 admin queue → outlier check → eligibility check → VWAP). Zero expert judgment in published-number path. | Hierarchy is implicit, not published. | P1 | Add "Hierarchy of data inputs" subsection to `/methodology` listing each ingestion stage and the deterministic rule — **ship in the same proposal as the P7 self-classification** (same edit to the same page). See [`notes/2026-05-12-listings-vs-transactions-iosco-p7.md`](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md) §4–5. |
 | P9 | Transparency of benchmark determinations | partial | `/index/[slug]` shows daily values; `index_values_daily` carries `methodology_version`; provenance is reproducible from `price_snapshots`. | Per-day diagnostics (`numObservations`, providers contributing, outliers excluded, reliability scores) not surfaced on the public page. | P1 | Roadmap B9 — compliance-pack PDF; per-day audit card. |
 | P10 | Periodic review | partial | Charter on `/methodology` mandates quarterly Committee review of 90 days of research output. | First review not yet executed (due ~2026-07-29). No template defined. | P1 | Define `docs/research/reviews/<period>.md` template before the first review. |
 
@@ -69,12 +69,12 @@ Ordered by effort × leverage. P0 first, then P1, with the dependent items group
 1. P3 / P5 — Conflict-of-interest disclosure + single-administrator declaration on `/methodology`. *Half-day docs work.*
 2. P1 — Name the founding Committee member (Roadmap B7). *Five-minute UPDATE.*
 3. P16 — Publish complaints email + SLA on `/methodology`. *Half-day docs work, dependent on email mailbox.*
-4. P7 — Listings-vs-transactions research note. *One-day research; conclusion may be "self-classify as listed-price benchmark, document limitation".*
+4. P7 + P8 — Proposal for the `/methodology` "published-quote benchmark" self-classification + data-input hierarchy subsection. *Research done ([note](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md)); next step is the proposal-format doc, then a PR editing the hard-limit `/methodology` page. Closes two quality-pillar gaps in one edit.*
 
 **P1 (do these before audit-readiness conversation):**
 5. P2 — Third-party dependency map.
 6. P4 — Control-framework document mapping each control to a principle.
-7. P8 — Hierarchy-of-data-inputs subsection on `/methodology`.
+7. P8 — Hierarchy-of-data-inputs subsection on `/methodology` (now bundled with P0 item 4 — same proposal, same page edit).
 8. P9 — Per-day audit card / compliance-pack PDF (Roadmap B9).
 9. P10 — Quarterly-review template (before 2026-07-29).
 10. P12 — Dry-run methodology change procedure proposal (uses an inert v1.0.1 docs-only bump as the test case).
@@ -104,3 +104,4 @@ filename — it should always be the current state of the matrix.
 ### Revision log
 
 - **2026-05-10** — Initial population. 19 rows × 4 categories. 5 rows P0, 11 rows P1, 1 row P2, 2 rows n/a. One row each (P11, P6) `compliant`. (index-architect first run.)
+- **2026-05-12** — P7 row rewritten after [`notes/2026-05-12-listings-vs-transactions-iosco-p7.md`](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md): inputs reclassified as firm executable quotes (≈ BMR "committed quotes"), three-track response mapped (A: self-classify + hierarchy on `/methodology` — P0, needs proposal; B: invoice anchor + reconciliation — P1, infra; C: scaled quorum — P1, methodology-class). P8 action bundled into the same `/methodology` proposal. Priority-queue P0 item 4 updated from "write the research note" to "write the proposal". (index-architect third run.)
