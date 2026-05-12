@@ -205,28 +205,30 @@ Sequenced into three product lines (L1 Terminal → L2 Hedging-as-a-Service → 
 
 **Reconsider if:** team grows to 3+, or we bring on a contractor who needs partial admin access. Then move to a `user_profiles.role` enum.
 
-## Open question — index_calculator daily delta volatility (2026-05-11)
+## Open question — index_calculator daily delta volatility (2026-05-11 → 2026-05-12)
 
-**What:** Three observations on `index_values_daily.close_price` between 2026-05-09 → 2026-05-11:
+**Original observation (2026-05-11):** day-over-day moves on `close_price` looked catastrophic:
 
-| index | 2026-05-09 | 2026-05-10 | 2026-05-11 | day-over-day |
+| index | 2026-05-09 close | 2026-05-10 close | 2026-05-11 close | δ |
 |---|---|---|---|---|
 | cti-h100 | $2.690 | $2.690 | $1.534 | −43% |
 | cti-blackwell | $1.189 | $5.980 | $1.064 | −82% |
 | cti-composite | $2.690 | $5.980 | $0.877 | −85% |
 
-**What we know:**
-- `methodology_used` on these rows alternates between `simple_vwap` and `filtered_vwap` (the published v1.0 lock should pin it to `filtered_vwap`, so the variation itself is a smell).
-- `num_observations` jumped from 17–123 to 363–1000 between 2026-05-10 → 2026-05-11; new GPU SKUs and/or providers are entering the universe each day and the per-day sample is unstable.
-- The 24h-median for H100-SXM-80 specifically (queried directly) is $2.69 today, while `cti-h100.close_price` is $1.53. The index is including a wider set than just H100-SXM-80.
+**Root cause found (2026-05-12):** `close_price` is `max(observed_prices)` after an ascending sort (`index-calculator.ts:170`). It's not the published index level — it's the day's maximum observation. A single outlier (e.g. a B200 listing on 2026-05-10 at $5.98) rotates the daily max and creates fake catastrophic deltas.
 
-**Why this matters:**
-- The landing ticker now shows these deltas honestly (commit `<this one>`). On the surface they look like a market crash; they're an artefact of universe expansion, not a real move.
-- The locked methodology promise on `/methodology` says outputs must be reproducible from `methodology_version`. Right now the version says `v1.0` but the inputs are evidently changing day to day.
+**The real published value is `vwap`** — the output of the locked `filtered_vwap` methodology. With vwap:
 
-**Reconsider when:** before the next Index Architect run that touches methodology, dig into `apps/workers/src/functions/index-calculator.ts` and confirm:
-1. The eligibility filter (`is_outlier=false ∧ is_normalized=true ∧ reliability ≥ floor`) is being applied consistently per the published spec.
-2. The per-index `universe` (which `gpu_model_id`s contribute) is fixed or whether it expands with new SKUs.
-3. `methodology_used` should not vary day to day with a locked v1.0 — either the calculator is silently A/B'ing or there's a write path we missed.
+| index | 2026-05-09 vwap | 2026-05-10 vwap | 2026-05-11 vwap | real δ |
+|---|---|---|---|---|
+| cti-h100 | $2.647 | $2.641 | $1.494 | −43% |
+| cti-blackwell | $1.188 | $1.188 | $0.826 | −30% |
+| cti-composite | $1.311 | $1.205 | $0.875 | −27% |
 
-**Decision deferred:** intentionally not fixing this in the ticker pass. The ticker reflects DB state truthfully. The calculator audit is a separate workstream and may need the Index Committee.
+**Fixed:** the landing ticker switched to `vwap` (this commit). The remaining −43% on cti-h100 is still significant and warrants a calculator audit — the H100 universe expanded from 21 to 363 observations between 2026-05-09 and 2026-05-11, almost certainly including a wider set of H100 variants and/or lower-priced providers. That's a real signal we should understand before publishing index commentary.
+
+**Two follow-ups for the next session:**
+1. `close_price` / `open_price` / `high_price` / `low_price` columns should reflect real intra-day OHLC (first vs last observation by timestamp), not min/max. Today's calculator code is misusing them. Fix is one-liner per column in `index-calculator.ts:167-170`.
+2. The published index universe per `compute_indices.methodology.gpu_models` should be auditable — a row in `index_values_daily` should be able to identify which `gpu_model_id`s contributed. Today this is implicit. Worth adding `contributing_gpu_ids text[]` for traceability.
+
+**Methodology lock still holds:** `methodology_used` on every recent row is `filtered_vwap` v1.0 per the locked spec; the 2026-05-09 row showing `simple_vwap` is pre-lock historical residue.

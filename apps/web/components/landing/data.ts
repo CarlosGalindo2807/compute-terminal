@@ -51,7 +51,15 @@ function fmtUsd(n: number): string {
   return `$${n.toFixed(n < 1 ? 3 : 2)}`;
 }
 
-/** Latest value per index + day-over-day delta + a 14-day sparkline series. */
+/** Latest value per index + day-over-day delta + a 14-day sparkline series.
+ *
+ *  Reads `vwap` — the output of the locked methodology — NOT `close_price`.
+ *  close_price in this schema is `max(observed prices that day)` (see
+ *  apps/workers/src/functions/index-calculator.ts:170 — after ascending sort,
+ *  it takes the last element). That's an artefact of an earlier OHLC-style
+ *  shape and isn't the published index level. Day-over-day deltas of
+ *  close_price look catastrophic (−85%) when an outlier rotates the daily
+ *  max; vwap shows the real move. Documented in docs/decisions.md. */
 async function loadIndexTickerRows(): Promise<TickerItem[]> {
   try {
     const sb = getServiceClient();
@@ -62,19 +70,18 @@ async function loadIndexTickerRows(): Promise<TickerItem[]> {
     for (const idx of indices) {
       const { data } = await sb
         .from('index_values_daily')
-        .select('date, close_price')
+        .select('date, vwap')
         .eq('index_id', idx.id)
         .order('date', { ascending: false })
         .limit(14);
       if (!data || data.length === 0) continue;
-      const latest = Number(data[0]!.close_price);
-      const prev = data[1] ? Number(data[1].close_price) : latest;
+      const latest = Number(data[0]!.vwap);
+      const prev = data[1] ? Number(data[1].vwap) : latest;
       const d = prev > 0 ? ((latest - prev) / prev) * 100 : 0;
-      // Reverse chronological → render chronological for the sparkline.
       const series = data
         .slice()
         .reverse()
-        .map((r) => Number(r.close_price))
+        .map((r) => Number(r.vwap))
         .filter((n) => Number.isFinite(n));
       items.push({
         k: idx.slug.toUpperCase(),
