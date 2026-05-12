@@ -107,45 +107,36 @@ async function loadIndexTickerRows(): Promise<TickerItem[]> {
  *  Series: snapshots bucketed into 12 evenly-spaced 2-hour buckets, each
  *  bucket's median price. Feeds a real Sparkline. Empty buckets carry
  *  the previous non-empty bucket's value forward (last-observation-carried-
- *  forward), so visual gaps don't appear during scraper silence. */
+ *  forward), so visual gaps don't appear during scraper silence.
+ *
+ *  Why per-GPU ASC + DESC merged fetches rather than a single sweep:
+ *  PostgREST caps responses at max-rows=1000 even when `.limit(N)`
+ *  requests more (verified live 2026-05-12). With ~21k filtered
+ *  snapshots/24h across ~28 active GPUs, a single-table sweep returns
+ *  only the oldest ~1.1h of data; the bucketed ticker then has an empty
+ *  last quartile → delta=0 fallback → flat sparkline. Per-GPU windows
+ *  average ~750 rows but the busiest GPUs (H100·SXM, V100·SXM2, RTX
+ *  5090) exceed 1000/24h. So we issue two queries per GPU — oldest 1000
+ *  (ASC) and newest 1000 (DESC) — and dedupe by row id. That covers both
+ *  the firstQ (0-6h) and lastQ (18-24h) of the window for high-volume
+ *  GPUs; the middle is allowed to be sparse since LOCF fills the
+ *  sparkline gaps visually. 28 × 2 = 56 parallel queries hit the
+ *  (gpu_model_id, captured_at desc) WHERE is_outlier=false partial
+ *  index; the page is ISR-cached for 30s. */
 async function loadGpuTickerRows(): Promise<TickerItem[]> {
   try {
     const sb = getServiceClient();
     const since24Ms = Date.now() - 24 * 3600_000;
     const since24 = new Date(since24Ms).toISOString();
 
-    const [{ data: gpus }, { data: snaps }] = await Promise.all([
-      sb.from('gpu_models').select('id, slug, model, variant').eq('is_active', true),
-      sb
-        .from('price_snapshots')
-        .select('gpu_model_id, price_per_hour, captured_at')
-        .eq('is_outlier', false)
-        .eq('is_normalized', true)
-        .eq('currency', 'USD')
-        .gte('captured_at', since24)
-        .order('captured_at', { ascending: true })
-        .limit(20_000),
-    ]);
-    if (!gpus || !snaps) return [];
+    const { data: gpus } = await sb
+      .from('gpu_models')
+      .select('id, slug, model, variant')
+      .eq('is_active', true);
+    if (!gpus) return [];
 
     const N_BUCKETS = 12;
     const bucketMs = (24 * 3600_000) / N_BUCKETS;
-
-    type Acc = { prices: number[]; buckets: number[][] };
-    const byGpu = new Map<string, Acc>();
-    for (const s of snaps) {
-      const id = s.gpu_model_id as string;
-      const t = new Date(s.captured_at as string).getTime();
-      const p = Number(s.price_per_hour);
-      const cur = byGpu.get(id) ?? {
-        prices: [],
-        buckets: Array.from({ length: N_BUCKETS }, () => [] as number[]),
-      };
-      cur.prices.push(p);
-      const idx = Math.min(N_BUCKETS - 1, Math.max(0, Math.floor((t - since24Ms) / bucketMs)));
-      cur.buckets[idx]!.push(p);
-      byGpu.set(id, cur);
-    }
 
     const median = (xs: number[]): number => {
       const s = [...xs].sort((a, b) => a - b);
@@ -153,16 +144,60 @@ async function loadGpuTickerRows(): Promise<TickerItem[]> {
       return s.length % 2 === 0 ? (s[m - 1]! + s[m]!) / 2 : s[m]!;
     };
 
-    const rows: TickerItem[] = [];
-    for (const g of gpus) {
-      const stats = byGpu.get(g.id as string);
-      if (!stats || stats.prices.length < 8) continue;
+    const perGpu = await Promise.all(
+      gpus.map(async (g) => {
+        const [ascR, descR] = await Promise.all([
+          sb
+            .from('price_snapshots')
+            .select('id, price_per_hour, captured_at')
+            .eq('gpu_model_id', g.id as string)
+            .eq('is_outlier', false)
+            .eq('is_normalized', true)
+            .eq('currency', 'USD')
+            .gte('captured_at', since24)
+            .order('captured_at', { ascending: true })
+            .limit(1000),
+          sb
+            .from('price_snapshots')
+            .select('id, price_per_hour, captured_at')
+            .eq('gpu_model_id', g.id as string)
+            .eq('is_outlier', false)
+            .eq('is_normalized', true)
+            .eq('currency', 'USD')
+            .gte('captured_at', since24)
+            .order('captured_at', { ascending: false })
+            .limit(1000),
+        ]);
+        const seen = new Set<string>();
+        const snaps: Array<{ price_per_hour: number; captured_at: string }> = [];
+        for (const r of [...(ascR.data ?? []), ...(descR.data ?? [])]) {
+          const id = r.id as string;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          snaps.push({ price_per_hour: Number(r.price_per_hour), captured_at: r.captured_at as string });
+        }
+        return { g, snaps };
+      }),
+    );
 
-      const med24 = median(stats.prices);
+    const ranked: Array<{ n: number; item: TickerItem }> = [];
+    for (const { g, snaps } of perGpu) {
+      if (snaps.length < 8) continue;
 
-      // First quartile (first 3 buckets = ~6h) vs last quartile.
-      const firstQ = stats.buckets.slice(0, 3).flat();
-      const lastQ = stats.buckets.slice(N_BUCKETS - 3).flat();
+      const prices: number[] = [];
+      const buckets: number[][] = Array.from({ length: N_BUCKETS }, () => []);
+      for (const s of snaps) {
+        const t = new Date(s.captured_at as string).getTime();
+        const p = Number(s.price_per_hour);
+        prices.push(p);
+        const idx = Math.min(N_BUCKETS - 1, Math.max(0, Math.floor((t - since24Ms) / bucketMs)));
+        buckets[idx]!.push(p);
+      }
+
+      const med24 = median(prices);
+
+      const firstQ = buckets.slice(0, 3).flat();
+      const lastQ = buckets.slice(N_BUCKETS - 3).flat();
       let d = 0;
       if (firstQ.length > 0 && lastQ.length > 0) {
         const mF = median(firstQ);
@@ -170,26 +205,27 @@ async function loadGpuTickerRows(): Promise<TickerItem[]> {
         d = mF > 0 ? ((mL - mF) / mF) * 100 : 0;
       }
 
-      // Bucket-medians series with LOCF for empty buckets.
       const series: number[] = [];
       let lastSeen = med24;
-      for (const b of stats.buckets) {
+      for (const b of buckets) {
         if (b.length > 0) lastSeen = median(b);
         series.push(lastSeen);
       }
 
       const label = `${g.model}${g.variant ? '·' + g.variant : ''}`.toUpperCase().slice(0, 18);
-      rows.push({
-        k: label,
-        v: fmtUsd(med24),
-        d: Number(d.toFixed(2)),
-        seed: (g.slug as string).length * 7 + 3,
-        series,
+      ranked.push({
+        n: snaps.length,
+        item: {
+          k: label,
+          v: fmtUsd(med24),
+          d: Number(d.toFixed(2)),
+          seed: (g.slug as string).length * 7 + 3,
+          series,
+        },
       });
     }
-    // Most-active first (proxy: most snapshots in window).
-    rows.sort((a, b) => (b.series?.length ?? 0) - (a.series?.length ?? 0));
-    return rows.slice(0, 10);
+    ranked.sort((a, b) => b.n - a.n);
+    return ranked.slice(0, 10).map((r) => r.item);
   } catch {
     return [];
   }
@@ -349,7 +385,14 @@ export async function loadTokensEq(): Promise<TokensEqStats> {
 
 /** Top GPUs by 24h snapshot volume — backs the landing's /markets preview
  *  with real data instead of the hardcoded teaser. Returns the same row
- *  shape the MarketsPreview component already consumes. */
+ *  shape the MarketsPreview component already consumes.
+ *
+ *  Same per-GPU parallel pattern as the ticker loader: PostgREST caps
+ *  responses at 1000 rows, so a single-sweep `.limit(50_000)` actually
+ *  returns only the first ~1h of data when the table is busy. Querying
+ *  per GPU keeps each result well under the cap. For 90d extremes,
+ *  ORDER BY price_per_hour ASC/DESC LIMIT 1 grabs the min/max directly
+ *  without scanning the bucket — exploits the partial index. */
 export async function loadMarketsTop(limit = 12): Promise<MarketsRow[]> {
   try {
     const sb = getServiceClient();
@@ -358,81 +401,108 @@ export async function loadMarketsTop(limit = 12): Promise<MarketsRow[]> {
     const since24 = new Date(since24Ms).toISOString();
     const since90 = new Date(since90Ms).toISOString();
 
-    const [{ data: gpus }, { data: snaps24 }, { data: snaps90 }] = await Promise.all([
-      sb.from('gpu_models').select('id, slug, model, variant, vram_gb, form_factor').eq('is_active', true),
-      sb
-        .from('price_snapshots')
-        .select('gpu_model_id, price_per_hour, captured_at, provider_id')
-        .eq('is_outlier', false)
-        .eq('is_normalized', true)
-        .eq('currency', 'USD')
-        .gte('captured_at', since24)
-        .limit(50_000),
-      sb
-        .from('price_snapshots')
-        .select('gpu_model_id, price_per_hour')
-        .eq('is_outlier', false)
-        .eq('is_normalized', true)
-        .eq('currency', 'USD')
-        .gte('captured_at', since90)
-        .limit(200_000),
-    ]);
+    const { data: gpus } = await sb
+      .from('gpu_models')
+      .select('id, slug, model, variant, vram_gb, form_factor')
+      .eq('is_active', true);
+    if (!gpus) return [];
 
-    if (!gpus || !snaps24) return [];
-
-    type PerGpu = {
-      first: number;
-      last: number;
-      n: number;
-      sum: number;
-      providers: Set<string>;
-      lo90: number;
-      hi90: number;
-    };
-    const acc = new Map<string, PerGpu>();
-    for (const s of snaps24) {
-      const id = s.gpu_model_id as string;
-      const p = Number(s.price_per_hour);
-      const cur = acc.get(id) ?? { first: p, last: p, n: 0, sum: 0, providers: new Set<string>(), lo90: p, hi90: p };
-      cur.last = p;
-      cur.n += 1;
-      cur.sum += p;
-      cur.providers.add(s.provider_id as string);
-      acc.set(id, cur);
-    }
-    // Augment lo/hi with the 90d range — independent of the 24h bucket.
-    for (const s of snaps90 ?? []) {
-      const id = s.gpu_model_id as string;
-      const p = Number(s.price_per_hour);
-      const cur = acc.get(id);
-      if (!cur) continue;
-      if (p < cur.lo90) cur.lo90 = p;
-      if (p > cur.hi90) cur.hi90 = p;
-    }
+    const perGpu = await Promise.all(
+      gpus.map(async (g) => {
+        const [ascR, descR, loR, hiR] = await Promise.all([
+          sb
+            .from('price_snapshots')
+            .select('id, price_per_hour, captured_at, provider_id')
+            .eq('gpu_model_id', g.id as string)
+            .eq('is_outlier', false)
+            .eq('is_normalized', true)
+            .eq('currency', 'USD')
+            .gte('captured_at', since24)
+            .order('captured_at', { ascending: true })
+            .limit(1000),
+          sb
+            .from('price_snapshots')
+            .select('id, price_per_hour, captured_at, provider_id')
+            .eq('gpu_model_id', g.id as string)
+            .eq('is_outlier', false)
+            .eq('is_normalized', true)
+            .eq('currency', 'USD')
+            .gte('captured_at', since24)
+            .order('captured_at', { ascending: false })
+            .limit(1000),
+          sb
+            .from('price_snapshots')
+            .select('price_per_hour')
+            .eq('gpu_model_id', g.id as string)
+            .eq('is_outlier', false)
+            .eq('is_normalized', true)
+            .eq('currency', 'USD')
+            .gte('captured_at', since90)
+            .order('price_per_hour', { ascending: true })
+            .limit(1),
+          sb
+            .from('price_snapshots')
+            .select('price_per_hour')
+            .eq('gpu_model_id', g.id as string)
+            .eq('is_outlier', false)
+            .eq('is_normalized', true)
+            .eq('currency', 'USD')
+            .gte('captured_at', since90)
+            .order('price_per_hour', { ascending: false })
+            .limit(1),
+        ]);
+        const seen = new Set<string>();
+        const snaps24: Array<{ price_per_hour: number; captured_at: string; provider_id: string }> = [];
+        for (const r of [...(ascR.data ?? []), ...(descR.data ?? [])]) {
+          const id = r.id as string;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          snaps24.push({
+            price_per_hour: Number(r.price_per_hour),
+            captured_at: r.captured_at as string,
+            provider_id: r.provider_id as string,
+          });
+        }
+        snaps24.sort((a, b) => a.captured_at.localeCompare(b.captured_at));
+        return {
+          g,
+          snaps24,
+          lo90: loR.data?.[0] ? Number(loR.data[0].price_per_hour) : null,
+          hi90: hiR.data?.[0] ? Number(hiR.data[0].price_per_hour) : null,
+        };
+      }),
+    );
 
     const rows: MarketsRow[] = [];
-    for (const g of gpus) {
-      const stats = acc.get(g.id as string);
-      if (!stats || stats.n < 5) continue;
-      const mean = stats.sum / stats.n;
-      const d = stats.first > 0 ? ((stats.last - stats.first) / stats.first) * 100 : 0;
+    for (const { g, snaps24, lo90, hi90 } of perGpu) {
+      if (snaps24.length < 5) continue;
+
+      const first = snaps24[0]!.price_per_hour;
+      const last = snaps24[snaps24.length - 1]!.price_per_hour;
+      let sum = 0;
+      const providers = new Set<string>();
+      for (const s of snaps24) {
+        sum += s.price_per_hour;
+        providers.add(s.provider_id);
+      }
+      const mean = sum / snaps24.length;
+      const d = first > 0 ? ((last - first) / first) * 100 : 0;
       // Reliability: snapshots / expected ticks (24h × 12 tick/h per provider).
-      const expected = stats.providers.size * 288;
-      const reliability = Math.min(1, expected > 0 ? stats.n / expected : 0);
+      const expected = providers.size * 288;
+      const reliability = Math.min(1, expected > 0 ? snaps24.length / expected : 0);
 
       rows.push({
         g: (g.model as string).toUpperCase(),
         s: `${g.vram_gb} GB${g.form_factor ? ' · ' + (g.form_factor as string).toUpperCase() : ''}`,
         p: Number(mean.toFixed(3)),
         d: Number(d.toFixed(2)),
-        lo: Number(stats.lo90.toFixed(2)),
-        hi: Number(stats.hi90.toFixed(2)),
-        n: stats.providers.size,
+        lo: Number((lo90 ?? mean).toFixed(2)),
+        hi: Number((hi90 ?? mean).toFixed(2)),
+        n: providers.size,
         r: Number(reliability.toFixed(2)),
         seed: ((g.slug as string).length * 17 + (g.vram_gb as number)) | 0,
       });
     }
-    // Most-observed first, capped to limit.
     rows.sort((a, b) => b.n - a.n);
     return rows.slice(0, limit);
   } catch {

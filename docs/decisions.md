@@ -232,3 +232,20 @@ Sequenced into three product lines (L1 Terminal → L2 Hedging-as-a-Service → 
 2. The published index universe per `compute_indices.methodology.gpu_models` should be auditable — a row in `index_values_daily` should be able to identify which `gpu_model_id`s contributed. Today this is implicit. Worth adding `contributing_gpu_ids text[]` for traceability.
 
 **Methodology lock still holds:** `methodology_used` on every recent row is `filtered_vwap` v1.0 per the locked spec; the 2026-05-09 row showing `simple_vwap` is pre-lock historical residue.
+
+## PostgREST 1000-row cap + per-GPU ASC+DESC merge (added 2026-05-12)
+
+**What:** Supabase's PostgREST gateway hard-caps every REST response at 1000 rows regardless of `.limit(N)` or `Range` header (verified by direct probe: `limit=1000/1500/2000/5000` all return exactly 1000). This is the `db-max-rows` setting in PostgREST; it cannot be overridden per-request, only via Supabase project config.
+
+**Where it bit us:**
+1. `loadGpuTickerRows` in `apps/web/components/landing/data.ts` — single sweep `.limit(20_000)` actually returned only the oldest ~1.1h of the 24h window. firstQ buckets were populated, lastQ was empty → delta=0 fallback → every GPU sparkline rendered flat. Visible live on 2026-05-12 (9 of 12 ticker entries showing ▲ 0.00%).
+2. `loadMarketsTop` in the same file — landing markets-preview rows used `first` and `last` from the same biased window, so day-over-day movement was effectively zero and reliability was capped at 1/24 of true.
+3. `loadMarkets` in `apps/web/app/markets/page.tsx` — the full markets page suffered the same bias; the comment "Replaces a per-GPU loop (was 28 sequential round-trips)" reflected a perf optimization that, unaware of the cap, broke correctness.
+
+**Fix:** Per-GPU **ASC + DESC** parallel fetches (`.limit(1000)` each), deduped by row `id`. ASC gives the oldest 1000 rows in 24h, DESC gives the newest 1000. For low-volume GPUs (<1000/24h) both return the same set; for high-volume GPUs (>2000/24h) we get the first ~12h and last ~12h with a middle gap that the sparkline's last-observation-carried-forward fills visually. The (gpu_model_id, captured_at desc) WHERE `is_outlier=false` partial index covers both query directions cheaply. 28 GPUs × 2 directions = 56 parallel queries; measured 616 ms total on the live DB, well under the page's 30 s ISR budget.
+
+**Why not a Postgres RPC instead:** an RPC that returns bucketed/aggregated data per GPU would be one round trip and is what we'd build for v2. We chose the ASC+DESC merge today because (a) it ships without a migration, (b) it keeps the bucketing logic in TypeScript next to the page that renders it (easier to evolve), and (c) 616 ms × 1 per 30 s ISR window is not a meaningful cost.
+
+**Verified live (2026-05-12):** RTX 5090 +4.16 %, RTX 5080 +8.04 %, RTX 4090 −1.78 %, H100·PCIe −40.77 %, V100/A100/H100·SXM flat at 0.00 % (stable institutional reference prices — correct behavior). The remaining +176 % / +191 % on RTX 4080 Super / RTX 3090 are real but suspect outlier-filter leakage; that's a separate item against `index-calculator.ts` outlier detection, not this fix.
+
+**Reconsider when:** ticker or markets queries grow past the 56-parallel headroom (e.g., we add many more `gpu_models`), or we expose per-GPU stats via an API endpoint that needs sub-100 ms response times. Either trigger argues for a stored function (`rpc('gpu_ticker_24h', {...})`) that aggregates server-side and returns one row per GPU.

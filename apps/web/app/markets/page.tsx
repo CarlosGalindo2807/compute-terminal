@@ -29,83 +29,104 @@ async function loadMarkets(): Promise<Row[]> {
   const since1Ms = Date.now() - 1 * 3600_000;
   const since24 = new Date(since24Ms).toISOString();
 
-  // Two queries total: GPUs catalog + all eligible snapshots in window.
-  // Replaces a per-GPU loop (was 28 sequential round-trips).
-  const [{ data: gpus }, { data: snapsAll }] = await Promise.all([
-    sb
-      .from('gpu_models')
-      .select('id, slug, model, variant, vram_gb')
-      .eq('is_active', true)
-      .order('reference_price_per_hour', { ascending: false }),
-    sb
-      .from('price_snapshots')
-      .select('gpu_model_id, price_per_hour, captured_at, provider_id')
-      .eq('is_outlier', false)
-      .eq('is_normalized', true)
-      .gte('captured_at', since24)
-      .order('captured_at', { ascending: true })
-      .limit(50_000),
-  ]);
-
-  // Group snapshots by gpu_model_id once. O(N) instead of O(GPUs × N).
-  const byGpu = new Map<string, Snap[]>();
-  for (const s of (snapsAll as Snap[] | null) ?? []) {
-    if (!s.gpu_model_id) continue;
-    const arr = byGpu.get(s.gpu_model_id);
-    if (arr) arr.push(s);
-    else byGpu.set(s.gpu_model_id, [s]);
-  }
+  // Per-GPU parallel ASC+DESC fetches. PostgREST caps responses at 1000 rows
+  // even when .limit(50_000) is requested (verified 2026-05-12), so a single
+  // sweep returned only the oldest ~1h of snapshots → bogus first/last deltas
+  // and sparklines that flat-lined past bucket 1. ASC limit 1000 + DESC limit
+  // 1000 deduped by id covers both ends of the 24h window for high-volume
+  // GPUs. Hits the (gpu_model_id, captured_at desc) WHERE is_outlier=false
+  // partial index.
+  const { data: gpus } = await sb
+    .from('gpu_models')
+    .select('id, slug, model, variant, vram_gb')
+    .eq('is_active', true)
+    .order('reference_price_per_hour', { ascending: false });
 
   const buckets = 24;
   const bucketMs = (24 * 3600_000) / buckets;
 
-  return (gpus ?? []).map((g) => {
-    const snaps = byGpu.get(g.id) ?? [];
-    const name = `${g.model}${g.variant ? ' ' + g.variant : ''}`;
-
-    if (snaps.length === 0) {
-      return { gpu_id: g.id, slug: g.slug, name, vram: g.vram_gb, current: NaN, change_pct: NaN, num_providers: 0, spark: [] };
-    }
-
-    // Single linear pass: compute earliest, last hour avg, sparkline buckets,
-    // and provider set without re-scanning the snapshots array each time.
-    const sparkSum = new Array<number>(buckets).fill(0);
-    const sparkCount = new Array<number>(buckets).fill(0);
-    let recentSum = 0;
-    let recentCount = 0;
-    const providers = new Set<string>();
-
-    for (const s of snaps) {
-      const t = new Date(s.captured_at).getTime();
-      const idx = Math.min(buckets - 1, Math.max(0, Math.floor((t - since24Ms) / bucketMs)));
-      const p = Number(s.price_per_hour);
-      sparkSum[idx]! += p;
-      sparkCount[idx]! += 1;
-      if (t >= since1Ms) {
-        recentSum += p;
-        recentCount += 1;
+  const results = await Promise.all(
+    (gpus ?? []).map(async (g) => {
+      const [ascR, descR] = await Promise.all([
+        sb
+          .from('price_snapshots')
+          .select('id, price_per_hour, captured_at, provider_id')
+          .eq('gpu_model_id', g.id)
+          .eq('is_outlier', false)
+          .eq('is_normalized', true)
+          .gte('captured_at', since24)
+          .order('captured_at', { ascending: true })
+          .limit(1000),
+        sb
+          .from('price_snapshots')
+          .select('id, price_per_hour, captured_at, provider_id')
+          .eq('gpu_model_id', g.id)
+          .eq('is_outlier', false)
+          .eq('is_normalized', true)
+          .gte('captured_at', since24)
+          .order('captured_at', { ascending: false })
+          .limit(1000),
+      ]);
+      const seen = new Set<string>();
+      const snaps: Snap[] = [];
+      for (const r of [...(ascR.data ?? []), ...(descR.data ?? [])]) {
+        const id = r.id as string;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        snaps.push({
+          gpu_model_id: g.id,
+          price_per_hour: Number(r.price_per_hour),
+          captured_at: r.captured_at as string,
+          provider_id: r.provider_id as string,
+        });
       }
-      providers.add(s.provider_id);
-    }
+      snaps.sort((a, b) => a.captured_at.localeCompare(b.captured_at));
+      const name = `${g.model}${g.variant ? ' ' + g.variant : ''}`;
 
-    const earliest = Number(snaps[0]!.price_per_hour);
-    const lastPrice = Number(snaps[snaps.length - 1]!.price_per_hour);
-    const current = recentCount > 0 ? recentSum / recentCount : lastPrice;
-    const change_pct = earliest > 0 ? (current - earliest) / earliest : NaN;
-
-    const spark: number[] = [];
-    let lastSeen = current;
-    for (let i = 0; i < buckets; i++) {
-      if (sparkCount[i]! > 0) {
-        lastSeen = sparkSum[i]! / sparkCount[i]!;
-        spark.push(lastSeen);
-      } else {
-        spark.push(lastSeen);
+      if (snaps.length === 0) {
+        return { gpu_id: g.id, slug: g.slug, name, vram: g.vram_gb, current: NaN, change_pct: NaN, num_providers: 0, spark: [] } satisfies Row;
       }
-    }
 
-    return { gpu_id: g.id, slug: g.slug, name, vram: g.vram_gb, current, change_pct, num_providers: providers.size, spark };
-  });
+      const sparkSum = new Array<number>(buckets).fill(0);
+      const sparkCount = new Array<number>(buckets).fill(0);
+      let recentSum = 0;
+      let recentCount = 0;
+      const providers = new Set<string>();
+
+      for (const s of snaps) {
+        const t = new Date(s.captured_at).getTime();
+        const idx = Math.min(buckets - 1, Math.max(0, Math.floor((t - since24Ms) / bucketMs)));
+        const p = Number(s.price_per_hour);
+        sparkSum[idx]! += p;
+        sparkCount[idx]! += 1;
+        if (t >= since1Ms) {
+          recentSum += p;
+          recentCount += 1;
+        }
+        providers.add(s.provider_id);
+      }
+
+      const earliest = Number(snaps[0]!.price_per_hour);
+      const lastPrice = Number(snaps[snaps.length - 1]!.price_per_hour);
+      const current = recentCount > 0 ? recentSum / recentCount : lastPrice;
+      const change_pct = earliest > 0 ? (current - earliest) / earliest : NaN;
+
+      const spark: number[] = [];
+      let lastSeen = current;
+      for (let i = 0; i < buckets; i++) {
+        if (sparkCount[i]! > 0) {
+          lastSeen = sparkSum[i]! / sparkCount[i]!;
+          spark.push(lastSeen);
+        } else {
+          spark.push(lastSeen);
+        }
+      }
+
+      return { gpu_id: g.id, slug: g.slug, name, vram: g.vram_gb, current, change_pct, num_providers: providers.size, spark } satisfies Row;
+    }),
+  );
+
+  return results;
 }
 
 export default async function MarketsPage() {
