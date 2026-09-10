@@ -29,6 +29,9 @@ venv/
 .idea/
 *.swp
 
+# TypeScript incremental build cache
+*.tsbuildinfo
+
 # OS
 Thumbs.db
 
