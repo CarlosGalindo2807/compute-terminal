@@ -1,7 +1,9 @@
 # Gap matrix — IOSCO Principles for Financial Benchmarks vs CTI v1.0
 
 **Living document.** Updated in place as our state changes. Latest revision:
-2026-05-12 (P7 row + queue updated after the listings-vs-transactions note).
+2026-09-21 (STOP annotation on P0 item 4 — the P7 + P8 proposal has been
+drafted 30+ times across open PRs #8–#38; do not redraft, see
+[`notes/2026-09-21-p7-p8-proposal-pileup-and-routine-drift.md`](../notes/2026-09-21-p7-p8-proposal-pileup-and-routine-drift.md)).
 
 **Companion note:** [`docs/research/notes/2026-05-10-iosco-principles-applied-to-cti.md`](../notes/2026-05-10-iosco-principles-applied-to-cti.md)
 — full prose, citations, and reasoning behind every row below.
@@ -69,7 +71,7 @@ Ordered by effort × leverage. P0 first, then P1, with the dependent items group
 1. P3 / P5 — Conflict-of-interest disclosure + single-administrator declaration on `/methodology`. *Half-day docs work.*
 2. P1 — Name the founding Committee member (Roadmap B7). *Five-minute UPDATE.*
 3. P16 — Publish complaints email + SLA on `/methodology`. *Half-day docs work, dependent on email mailbox.*
-4. P7 + P8 — Proposal for the `/methodology` "published-quote benchmark" self-classification + data-input hierarchy subsection. *Research done ([note](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md)); next step is the proposal-format doc, then a PR editing the hard-limit `/methodology` page. Closes two quality-pillar gaps in one edit.*
+4. **P7 + P8 — STOP, DO NOT REDRAFT.** The `/methodology` "published-quote benchmark" self-classification + data-input hierarchy proposal has been drafted **30+ times** across open PRs `#8` through `#38` between 2026-05-14 and 2026-09-17. All are substantively identical; none has merged; `main` is unchanged since 2026-05-12. Canonical instance for @CarlosGalindo2807 review: **PR #38** (`index-architect/2026-09-17-published-quote-benchmark-classification`, [github.com/CarlosGalindo2807/compute-terminal/pull/38](https://github.com/CarlosGalindo2807/compute-terminal/pull/38)). Full diagnosis and the recommended next-session behavior are in [`notes/2026-09-21-p7-p8-proposal-pileup-and-routine-drift.md`](../notes/2026-09-21-p7-p8-proposal-pileup-and-routine-drift.md). *Blocked on:* owner review-or-reject of PR #38. Next session should skip this item and pick from P0 items 1, 2, 3, or from P1 items 5, 6, 9.
 
 **P1 (do these before audit-readiness conversation):**
 5. P2 — Third-party dependency map.
@@ -105,3 +107,4 @@ filename — it should always be the current state of the matrix.
 
 - **2026-05-10** — Initial population. 19 rows × 4 categories. 5 rows P0, 11 rows P1, 1 row P2, 2 rows n/a. One row each (P11, P6) `compliant`. (index-architect first run.)
 - **2026-05-12** — P7 row rewritten after [`notes/2026-05-12-listings-vs-transactions-iosco-p7.md`](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md): inputs reclassified as firm executable quotes (≈ BMR "committed quotes"), three-track response mapped (A: self-classify + hierarchy on `/methodology` — P0, needs proposal; B: invoice anchor + reconciliation — P1, infra; C: scaled quorum — P1, methodology-class). P8 action bundled into the same `/methodology` proposal. Priority-queue P0 item 4 updated from "write the research note" to "write the proposal". (index-architect third run.)
+- **2026-09-21** — P0 item 4 marked STOP after diagnosis in [`notes/2026-09-21-p7-p8-proposal-pileup-and-routine-drift.md`](../notes/2026-09-21-p7-p8-proposal-pileup-and-routine-drift.md): 30 open PRs (#8–#38) contain substantively identical drafts of the same proposal; none merged; `main` frozen since 2026-05-12. Canonical instance is PR #38. Owner action required (review-or-reject of #38, plus optional bulk-close of the redundant 29). Row status cells for P7 and P8 are unchanged pending that action. Next-session guidance added inline. (index-architect scheduled run, 2026-09-21.)
