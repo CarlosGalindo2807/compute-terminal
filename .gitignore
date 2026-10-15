@@ -6,6 +6,7 @@ dist/
 build/
 .turbo/
 coverage/
+*.tsbuildinfo
 *.log
 .DS_Store
 .env
