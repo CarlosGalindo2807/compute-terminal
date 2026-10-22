@@ -1,7 +1,9 @@
 # Gap matrix — IOSCO Principles for Financial Benchmarks vs CTI v1.0
 
 **Living document.** Updated in place as our state changes. Latest revision:
-2026-05-12 (P7 row + queue updated after the listings-vs-transactions note).
+2026-10-22 (P3/P5 COI + single-admin policy drafted at
+`docs/governance/conflicts-of-interest.md`; STOP-annotation added to P0
+item 4 after the P7+P8 proposal pile-up, see PR #39).
 
 **Companion note:** [`docs/research/notes/2026-05-10-iosco-principles-applied-to-cti.md`](../notes/2026-05-10-iosco-principles-applied-to-cti.md)
 — full prose, citations, and reasoning behind every row below.
@@ -66,10 +68,10 @@
 Ordered by effort × leverage. P0 first, then P1, with the dependent items grouped.
 
 **P0 (do these before any external "we are IOSCO-aligned" claim):**
-1. P3 / P5 — Conflict-of-interest disclosure + single-administrator declaration on `/methodology`. *Half-day docs work.*
-2. P1 — Name the founding Committee member (Roadmap B7). *Five-minute UPDATE.*
+1. P3 / P5 — Conflict-of-interest disclosure + single-administrator declaration. **Policy drafted 2026-10-22** at [`docs/governance/conflicts-of-interest.md`](../../governance/conflicts-of-interest.md) — see PR of the day. §3 current disclosure requires @CarlosGalindo2807 to fill in two fact-only fields (provider relationships, downstream relationships) before merge. On merge, closes P3 substantively and P5 by option (b) — v1.0 is documented as single-administrator with a committed 2027-05-12 second-member date and a five-control oversight substitute. A subsequent hard-limit `/methodology` proposal will surface a public excerpt.
+2. P1 — Name the founding Committee member (Roadmap B7). *Five-minute UPDATE statement.*
 3. P16 — Publish complaints email + SLA on `/methodology`. *Half-day docs work, dependent on email mailbox.*
-4. P7 + P8 — Proposal for the `/methodology` "published-quote benchmark" self-classification + data-input hierarchy subsection. *Research done ([note](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md)); next step is the proposal-format doc, then a PR editing the hard-limit `/methodology` page. Closes two quality-pillar gaps in one edit.*
+4. **🛑 P7 + P8 — STOP drafting new proposals.** Ten open PRs (#38, #40, #41, #42, #43, #44, #45, #46, #47 — plus #47 since closed as a duplicate — and the meta-diagnosis #39) are all stalled on @CarlosGalindo2807's review of the same P7+P8 self-classification + data-input hierarchy. Research done ([note](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md)). The next action is **not** another proposal: it is for @CarlosGalindo2807 to pick one of the open PRs as canonical, review it, and bulk-close the rest. Until one merges, this item is **not available to the index-architect routine** — future runs that find this file must pick a different P0 item (currently 1, 2, 3) or any P1 item. See PR #39 for the full diagnosis.
 
 **P1 (do these before audit-readiness conversation):**
 5. P2 — Third-party dependency map.
@@ -105,3 +107,4 @@ filename — it should always be the current state of the matrix.
 
 - **2026-05-10** — Initial population. 19 rows × 4 categories. 5 rows P0, 11 rows P1, 1 row P2, 2 rows n/a. One row each (P11, P6) `compliant`. (index-architect first run.)
 - **2026-05-12** — P7 row rewritten after [`notes/2026-05-12-listings-vs-transactions-iosco-p7.md`](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md): inputs reclassified as firm executable quotes (≈ BMR "committed quotes"), three-track response mapped (A: self-classify + hierarchy on `/methodology` — P0, needs proposal; B: invoice anchor + reconciliation — P1, infra; C: scaled quorum — P1, methodology-class). P8 action bundled into the same `/methodology` proposal. Priority-queue P0 item 4 updated from "write the research note" to "write the proposal". (index-architect third run.)
+- **2026-10-22** — P3/P5 governance policy drafted at [`docs/governance/conflicts-of-interest.md`](../../governance/conflicts-of-interest.md): administrator-identity declaration (P5 option b), four-prong conflict-of-interest test with explicit US$5k / US$250 / US$10k thresholds (P3), five-control compensating oversight framework, recusal procedure, quarterly review cadence, 2027-05-12 committed second-member date. @CarlosGalindo2807 fills in two fact-only fields before merge. On merge, closes P3 substantively and P5 by option (b); P0 item 1 moves to "awaiting Committee adoption." Priority-queue P0 item 4 (P7/P8) STOP-annotated after discovery of the 10-open-PR pile-up diagnosed in PR #39: next action is Committee review of one existing proposal + bulk-close of the rest, **not** another draft. Future index-architect runs that read this file must pick a different P0 item until the pile unblocks. Today's run also opened and then closed PR #47 — the 10th duplicate P7+P8 proposal — after listing open PRs mid-session caught the duplication; the pivot to P3/P5 is the actual deliverable. (index-architect fourth run.)
