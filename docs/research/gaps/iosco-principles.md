@@ -1,7 +1,7 @@
 # Gap matrix — IOSCO Principles for Financial Benchmarks vs CTI v1.0
 
 **Living document.** Updated in place as our state changes. Latest revision:
-2026-05-12 (P7 row + queue updated after the listings-vs-transactions note).
+2026-10-29 (P7 / P8 queue items now point at the drafted proposal; status unchanged until the implementing PR merges).
 
 **Companion note:** [`docs/research/notes/2026-05-10-iosco-principles-applied-to-cti.md`](../notes/2026-05-10-iosco-principles-applied-to-cti.md)
 — full prose, citations, and reasoning behind every row below.
@@ -69,7 +69,7 @@ Ordered by effort × leverage. P0 first, then P1, with the dependent items group
 1. P3 / P5 — Conflict-of-interest disclosure + single-administrator declaration on `/methodology`. *Half-day docs work.*
 2. P1 — Name the founding Committee member (Roadmap B7). *Five-minute UPDATE.*
 3. P16 — Publish complaints email + SLA on `/methodology`. *Half-day docs work, dependent on email mailbox.*
-4. P7 + P8 — Proposal for the `/methodology` "published-quote benchmark" self-classification + data-input hierarchy subsection. *Research done ([note](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md)); next step is the proposal-format doc, then a PR editing the hard-limit `/methodology` page. Closes two quality-pillar gaps in one edit.*
+4. P7 + P8 — Proposal for the `/methodology` "published-quote benchmark" self-classification + data-input hierarchy subsection. *Proposal drafted at [`proposals/2026-10-29-methodology-published-quote-classification.md`](../proposals/2026-10-29-methodology-published-quote-classification.md). Awaiting @CarlosGalindo2807 review; on approval, a second (implementing) PR edits the hard-limit `/methodology` page. Closes two quality-pillar gaps in one edit.*
 
 **P1 (do these before audit-readiness conversation):**
 5. P2 — Third-party dependency map.
@@ -105,3 +105,4 @@ filename — it should always be the current state of the matrix.
 
 - **2026-05-10** — Initial population. 19 rows × 4 categories. 5 rows P0, 11 rows P1, 1 row P2, 2 rows n/a. One row each (P11, P6) `compliant`. (index-architect first run.)
 - **2026-05-12** — P7 row rewritten after [`notes/2026-05-12-listings-vs-transactions-iosco-p7.md`](../notes/2026-05-12-listings-vs-transactions-iosco-p7.md): inputs reclassified as firm executable quotes (≈ BMR "committed quotes"), three-track response mapped (A: self-classify + hierarchy on `/methodology` — P0, needs proposal; B: invoice anchor + reconciliation — P1, infra; C: scaled quorum — P1, methodology-class). P8 action bundled into the same `/methodology` proposal. Priority-queue P0 item 4 updated from "write the research note" to "write the proposal". (index-architect third run.)
+- **2026-10-29** — P0 item 4 proposal drafted at [`proposals/2026-10-29-methodology-published-quote-classification.md`](../proposals/2026-10-29-methodology-published-quote-classification.md); specifies the exact `/methodology` additions (self-classification sentence + numbered Data-Input-Hierarchy section) and documents why the 30-day notice does not apply (no change to `PUBLISHED_METHODOLOGY`). Row P7 and P8 statuses unchanged (`partial / structurally weak` and `partial`) until the implementing PR merges — on that merge, P8 moves to `compliant` and P7 to `partial` with the remaining Track B gap. (index-architect fourth run.)
